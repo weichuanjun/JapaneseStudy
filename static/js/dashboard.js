@@ -12,6 +12,10 @@ const chartConfig = {
         plugins: {
             legend: {
                 position: 'top',
+                labels: {
+                    usePointStyle: true,  // 使用圆点样式
+                    pointStyle: 'circle'   // 设置为圆形
+                }
             }
         }
     }
@@ -32,25 +36,33 @@ function initReadingChart() {
                 label: '正確性',
                 data: [],
                 borderColor: 'rgb(255, 99, 132)',
-                tension: 0.1
+                backgroundColor: 'rgb(255, 99, 132)',
+                tension: 0.1,
+                pointStyle: 'circle'
             },
             {
                 label: '流暢さ',
                 data: [],
                 borderColor: 'rgb(54, 162, 235)',
-                tension: 0.1
+                backgroundColor: 'rgb(54, 162, 235)',
+                tension: 0.1,
+                pointStyle: 'circle'
             },
             {
                 label: '完全性',
                 data: [],
                 borderColor: 'rgb(75, 192, 192)',
-                tension: 0.1
+                backgroundColor: 'rgb(75, 192, 192)',
+                tension: 0.1,
+                pointStyle: 'circle'
             },
             {
                 label: '発音',
                 data: [],
                 borderColor: 'rgb(153, 102, 255)',
-                tension: 0.1
+                backgroundColor: 'rgb(153, 102, 255)',
+                tension: 0.1,
+                pointStyle: 'circle'
             }
         ]
     };
@@ -74,19 +86,25 @@ function initTopicChart() {
                 label: '文法',
                 data: [],
                 borderColor: 'rgb(255, 99, 132)',
-                tension: 0.1
+                backgroundColor: 'rgb(255, 99, 132)',
+                tension: 0.1,
+                pointStyle: 'circle'
             },
             {
                 label: '内容',
                 data: [],
                 borderColor: 'rgb(54, 162, 235)',
-                tension: 0.1
+                backgroundColor: 'rgb(54, 162, 235)',
+                tension: 0.1,
+                pointStyle: 'circle'
             },
             {
                 label: '関連性',
                 data: [],
                 borderColor: 'rgb(75, 192, 192)',
-                tension: 0.1
+                backgroundColor: 'rgb(75, 192, 192)',
+                tension: 0.1,
+                pointStyle: 'circle'
             }
         ]
     };
@@ -114,7 +132,117 @@ function showError(elementId, message) {
     }
 }
 
-// 加载读文章记录
+// 显示详细记录弹窗
+function showRecordPopup(record, type) {
+    // 创建弹窗元素
+    const overlay = document.createElement('div');
+    overlay.className = 'popup-overlay';
+
+    const content = document.createElement('div');
+    content.className = 'popup-content';
+
+    // 构建弹窗内容
+    let popupHTML = `
+        <div class="popup-header">
+            <h3 class="popup-title">${type === 'reading' ? '文章を読む' : 'Topic'} 記録詳細</h3>
+            <button class="popup-close">&times;</button>
+        </div>
+        <div class="popup-body">
+    `;
+
+    if (type === 'reading') {
+        popupHTML += `
+            <div class="popup-section">
+                <div class="popup-section-title">日付</div>
+                <div class="popup-text">${record.date}</div>
+                
+                <div class="popup-section-title">文章</div>
+                <div class="popup-text">${record.text}</div>
+                
+                <div class="popup-section-title">スコア</div>
+                <div class="popup-scores">
+                    <div class="score-item">
+                        <div class="score-label">正確性</div>
+                        <div class="score-value">${record.accuracy}</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">流暢さ</div>
+                        <div class="score-value">${record.fluency}</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">完全性</div>
+                        <div class="score-value">${record.completeness}</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">発音</div>
+                        <div class="score-value">${record.pronunciation}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        popupHTML += `
+            <div class="popup-section">
+                <div class="popup-section-title">日付</div>
+                <div class="popup-text">${record.date}</div>
+                
+                <div class="popup-section-title">トピック</div>
+                <div class="popup-text">${record.topic}</div>
+                
+                <div class="popup-section-title">あなたの回答</div>
+                <div class="popup-text">${record.answer || '回答なし'}</div>
+                
+                <div class="popup-section-title">文法の修正</div>
+                <div class="popup-text">${record.grammar_correction || '修正なし'}</div>
+                
+                <div class="popup-section-title">アドバイス</div>
+                <div class="popup-text">${record.feedback || 'アドバイスなし'}</div>
+                
+                <div class="popup-section-title">スコア</div>
+                <div class="popup-scores">
+                    <div class="score-item">
+                        <div class="score-label">文法</div>
+                        <div class="score-value">${record.grammar}</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">内容</div>
+                        <div class="score-value">${record.content}</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">関連性</div>
+                        <div class="score-value">${record.relevance}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    popupHTML += `</div>`;
+    content.innerHTML = popupHTML;
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    // 添加关闭事件
+    const closeBtn = content.querySelector('.popup-close');
+    closeBtn.addEventListener('click', () => {
+        overlay.classList.remove('active');
+        setTimeout(() => overlay.remove(), 300);
+    });
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 300);
+        }
+    });
+
+    // 显示弹窗
+    requestAnimationFrame(() => {
+        overlay.classList.add('active');
+    });
+}
+
+// 更新加载读文章记录的函数
 async function loadReadingRecords() {
     showLoading('readingRecordsBody');
     try {
@@ -129,29 +257,36 @@ async function loadReadingRecords() {
             return;
         }
 
+        // 反转数据顺序，使最新的数据在右边
+        const reversedData = [...data].reverse();
+
         // 更新图表
         if (readingChart) {
-            readingChart.data.labels = data.map(record => record.date);
-            readingChart.data.datasets[0].data = data.map(record => record.accuracy);
-            readingChart.data.datasets[1].data = data.map(record => record.fluency);
-            readingChart.data.datasets[2].data = data.map(record => record.completeness);
-            readingChart.data.datasets[3].data = data.map(record => record.pronunciation);
+            readingChart.data.labels = reversedData.map(record => record.date);
+            readingChart.data.datasets[0].data = reversedData.map(record => record.accuracy);
+            readingChart.data.datasets[1].data = reversedData.map(record => record.fluency);
+            readingChart.data.datasets[2].data = reversedData.map(record => record.completeness);
+            readingChart.data.datasets[3].data = reversedData.map(record => record.pronunciation);
             readingChart.update();
         }
 
         // 更新详细记录表格
         const tbody = document.getElementById('readingRecordsBody');
         if (tbody) {
-            tbody.innerHTML = data.map(record => `
-                <tr>
+            tbody.innerHTML = '';
+            data.forEach(record => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
                     <td>${record.date}</td>
-                    <td>${record.text}</td>
+                    <td class="truncate">${record.text}</td>
                     <td>${record.accuracy}</td>
                     <td>${record.fluency}</td>
                     <td>${record.completeness}</td>
                     <td>${record.pronunciation}</td>
-                </tr>
-            `).join('');
+                `;
+                tr.addEventListener('click', () => showRecordPopup(record, 'reading'));
+                tbody.appendChild(tr);
+            });
         }
     } catch (error) {
         console.error('Error loading reading records:', error);
@@ -159,7 +294,7 @@ async function loadReadingRecords() {
     }
 }
 
-// 加载Topic记录
+// 更新加载Topic记录的函数
 async function loadTopicRecords() {
     showLoading('topicRecordsBody');
     try {
@@ -174,27 +309,34 @@ async function loadTopicRecords() {
             return;
         }
 
+        // 反转数据顺序，使最新的数据在右边
+        const reversedData = [...data].reverse();
+
         // 更新图表
         if (topicChart) {
-            topicChart.data.labels = data.map(record => record.date);
-            topicChart.data.datasets[0].data = data.map(record => record.grammar);
-            topicChart.data.datasets[1].data = data.map(record => record.content);
-            topicChart.data.datasets[2].data = data.map(record => record.relevance);
+            topicChart.data.labels = reversedData.map(record => record.date);
+            topicChart.data.datasets[0].data = reversedData.map(record => record.grammar);
+            topicChart.data.datasets[1].data = reversedData.map(record => record.content);
+            topicChart.data.datasets[2].data = reversedData.map(record => record.relevance);
             topicChart.update();
         }
 
         // 更新详细记录表格
         const tbody = document.getElementById('topicRecordsBody');
         if (tbody) {
-            tbody.innerHTML = data.map(record => `
-                <tr>
+            tbody.innerHTML = '';
+            data.forEach(record => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
                     <td>${record.date}</td>
-                    <td>${record.topic}</td>
+                    <td class="truncate">${record.topic}</td>
                     <td>${record.grammar}</td>
                     <td>${record.content}</td>
                     <td>${record.relevance}</td>
-                </tr>
-            `).join('');
+                `;
+                tr.addEventListener('click', () => showRecordPopup(record, 'topic'));
+                tbody.appendChild(tr);
+            });
         }
     } catch (error) {
         console.error('Error loading topic records:', error);

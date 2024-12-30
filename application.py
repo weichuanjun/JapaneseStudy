@@ -742,10 +742,13 @@ def get_topic_records():
     
     return jsonify([{
         'date': record.practice_date.strftime('%Y-%m-%d'),
-        'topic': record.topic[:50] + '...' if len(record.topic) > 50 else record.topic,
+        'topic': record.topic,
+        'answer': record.response,
         'grammar': record.grammar_score,
         'content': record.content_score,
-        'relevance': record.relevance_score
+        'relevance': record.relevance_score,
+        'feedback': record.feedback,
+        'grammar_correction': record.grammar_correction
     } for record in records])
 
 @app.route("/api/reading/leaderboard")
