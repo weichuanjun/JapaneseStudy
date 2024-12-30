@@ -61,9 +61,10 @@
 <body>
     <nav class="navbar">
         <ul class="nav-links">
-            <li><a href="#" data-tab="read" class="active">文章を読む</a></li>
-            <li><a href="#" data-tab="topic">Topic</a></li>
-            <li><a href="#" data-tab="practice">練習</a></li>
+            <li><a href="#" data-tab="dashboard" {% if active_tab == 'dashboard' %}class="active"{% endif %}>ダッシュボード</a></li>
+            <li><a href="#" data-tab="read" {% if active_tab == 'read' %}class="active"{% endif %}>文章を読む</a></li>
+            <li><a href="#" data-tab="topic" {% if active_tab == 'topic' %}class="active"{% endif %}>Topic</a></li>
+            <li><a href="#" data-tab="practice" {% if active_tab == 'practice' %}class="active"{% endif %}>練習</a></li>
         </ul>
         <div class="user-menu">
             {% if session.get('user_id') %}

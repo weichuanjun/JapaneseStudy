@@ -551,24 +551,26 @@ def get_grammar_feedback(text):
 def get_topic_feedback(text, topic):
     """获取主题相关的反馈和评分"""
     url = "http://localhost:11434/api/generate"
-    prompt = f"""以下の日本語の回答を評価し、JSON形式で返してください。
+    prompt = f"""以下の回答を評価してください。
 
 トピック: {topic}
 回答: {text}
 
-評価基準：
-- grammar_score: 文法の正確性（0-100点）
-- content_score: 内容の充実度（0-100点）
-- relevance_score: トピックとの関連性（0-100点）
-- feedback: 改善のためのアドバイス（箇条書き）
+以下の形式で出力してください。他の説明は一切不要です。
 
-必ず以下のJSON形式で出力してください。他の説明は不要です：
 {{
-    "grammar_score": 数値,
-    "content_score": 数値,
-    "relevance_score": 数値,
-    "feedback": "アドバイス"
-}}"""
+    "grammar_score": 70,
+    "content_score": 80,
+    "relevance_score": 90,
+    "feedback": "改善点をここに書いてください"
+}}
+
+注意事項：
+- 数値は0-100の整数で記入（例：70）
+- feedbackは必ず""で囲む
+- 改行は入れない
+- 余計な説明は一切加えない
+- 上記のJSONフォーマットを厳密に守る"""
 
     payload = {
         "model": "llama3.1:8b",
@@ -585,50 +587,90 @@ def get_topic_feedback(text, topic):
         logging.info(f"收到原始响应：{feedback_text}")
         
         try:
-            # 尝试直接解析返回的 JSON 字符串
+            # 清理和规范化 JSON 字符串
             import re
-            # 使用正则表达式提取 JSON 部分
-            json_match = re.search(r'\{[^}]+\}', feedback_text)
-            if json_match:
-                json_str = json_match.group()
-                logging.info(f"提取到的 JSON 字符串：{json_str}")
-                feedback_json = json.loads(json_str)
-                logging.info(f"解析后的 JSON 对象：{feedback_json}")
-                
-                # 确保所有必要的字段都存在
-                result = {
-                    "grammar_score": int(feedback_json.get("grammar_score", 0)),
-                    "content_score": int(feedback_json.get("content_score", 0)),
-                    "relevance_score": int(feedback_json.get("relevance_score", 0)),
-                    "feedback": feedback_json.get("feedback", "評価を生成できませんでした")
-                }
-                logging.info(f"最终处理的结果：{result}")
-                return result
-            else:
-                logging.warning("未找到 JSON 格式的响应，尝试解析文本格式")
-                # 如果无法找到 JSON，手动解析文本
-                scores = re.findall(r'\d+', feedback_text)[:3]  # 提取前三个数字作为分数
-                logging.info(f"提取到的分数：{scores}")
-                feedback = re.findall(r'アドバイス[：:](.*?)(?=\n|$)', feedback_text, re.DOTALL)
-                logging.info(f"提取到的反馈：{feedback}")
-                
-                result = {
-                    "grammar_score": int(scores[0]) if len(scores) > 0 else 0,
-                    "content_score": int(scores[1]) if len(scores) > 1 else 0,
-                    "relevance_score": int(scores[2]) if len(scores) > 2 else 0,
-                    "feedback": feedback[0].strip() if feedback else "評価を生成できませんでした"
-                }
-                logging.info(f"最终处理的结果：{result}")
-                return result
-        except (json.JSONDecodeError, ValueError, IndexError) as e:
+            
+            # 1. 提取 JSON 对象
+            json_match = re.search(r'\{.*?\}', feedback_text, re.DOTALL)
+            if not json_match:
+                raise ValueError("JSON not found in response")
+            
+            json_str = json_match.group()
+            
+            # 2. 清理JSON字符串
+            json_str = re.sub(r'\s+', ' ', json_str).strip()  # 删除多余的空白和换行
+            json_str = re.sub(r'「|」', '"', json_str)  # 替换日文引号
+            
+            logging.info(f"清理后的 JSON 字符串：{json_str}")
+            
+            # 3. 解析 JSON
+            feedback_json = json.loads(json_str)
+            
+            # 4. 构建结果
+            def parse_score(value):
+                try:
+                    score = int(str(value).replace('-', '0'))
+                    return max(0, min(100, score))
+                except (ValueError, TypeError):
+                    return 0
+            
+            result = {
+                "grammar_score": parse_score(feedback_json.get("grammar_score", 0)),
+                "content_score": parse_score(feedback_json.get("content_score", 0)),
+                "relevance_score": parse_score(feedback_json.get("relevance_score", 0)),
+                "feedback": str(feedback_json.get("feedback", "評価を生成できませんでした"))
+            }
+            
+            logging.info(f"最终处理的结果：{result}")
+            return result
+            
+        except (json.JSONDecodeError, ValueError) as e:
             logging.error(f"解析反馈时出错: {str(e)}")
             logging.error(f"原始文本: {feedback_text}")
-            return {
-                "grammar_score": 0,
-                "content_score": 0,
-                "relevance_score": 0,
-                "feedback": "評価の解析に失敗しました"
-            }
+            
+            # 尝试备用解析方法
+            try:
+                # 提取分数
+                scores = []
+                score_patterns = [
+                    (r'grammar_score"?\s*:\s*(\d+)', 'grammar_score'),
+                    (r'content_score"?\s*:\s*(\d+)', 'content_score'),
+                    (r'relevance_score"?\s*:\s*(\d+)', 'relevance_score')
+                ]
+                
+                extracted_scores = {}
+                for pattern, key in score_patterns:
+                    match = re.search(pattern, feedback_text)
+                    if match:
+                        extracted_scores[key] = int(match.group(1))
+                
+                # 提取feedback
+                feedback_match = re.search(r'feedback"?\s*:\s*"([^"]+)"', feedback_text)
+                feedback = feedback_match.group(1) if feedback_match else "評価を生成できませんでした"
+                
+                result = {
+                    "grammar_score": extracted_scores.get("grammar_score", 0),
+                    "content_score": extracted_scores.get("content_score", 0),
+                    "relevance_score": extracted_scores.get("relevance_score", 0),
+                    "feedback": feedback
+                }
+                
+                # 验证分数范围
+                for key in ["grammar_score", "content_score", "relevance_score"]:
+                    result[key] = max(0, min(100, result[key]))
+                
+                logging.info(f"备用解析结果：{result}")
+                return result
+                
+            except Exception as e2:
+                logging.error(f"备用解析也失败: {str(e2)}")
+                return {
+                    "grammar_score": 0,
+                    "content_score": 0,
+                    "relevance_score": 0,
+                    "feedback": "評価の解析に失敗しました"
+                }
+                
     except Exception as e:
         logging.error(f"获取反馈时出错: {str(e)}")
         return {
@@ -637,3 +679,83 @@ def get_topic_feedback(text, topic):
             "relevance_score": 0,
             "feedback": "評価の生成に失敗しました"
         }
+
+@app.route("/api/reading/records")
+@login_required
+def get_reading_records():
+    # 获取用户最近30天的阅读记录
+    records = ReadingRecord.query.filter_by(user_id=session['user_id'])\
+        .order_by(ReadingRecord.practice_date.desc())\
+        .limit(30)\
+        .all()
+    
+    return jsonify([{
+        'date': record.practice_date.strftime('%Y-%m-%d'),
+        'text': record.content[:50] + '...' if len(record.content) > 50 else record.content,
+        'accuracy': record.accuracy_score,
+        'fluency': record.fluency_score,
+        'completeness': record.completeness_score,
+        'pronunciation': record.pronunciation_score
+    } for record in records])
+
+@app.route("/api/topic/records")
+@login_required
+def get_topic_records():
+    # 获取用户最近30天的Topic记录
+    records = TopicRecord.query.filter_by(user_id=session['user_id'])\
+        .order_by(TopicRecord.practice_date.desc())\
+        .limit(30)\
+        .all()
+    
+    return jsonify([{
+        'date': record.practice_date.strftime('%Y-%m-%d'),
+        'topic': record.topic[:50] + '...' if len(record.topic) > 50 else record.topic,
+        'grammar': record.grammar_score,
+        'content': record.content_score,
+        'relevance': record.relevance_score
+    } for record in records])
+
+@app.route("/api/reading/leaderboard")
+@login_required
+def get_reading_leaderboard():
+    # 获取阅读练习的用户平均分排行榜
+    leaderboard = db.session.query(
+        User.username,
+        db.func.avg(
+            (ReadingRecord.accuracy_score + 
+             ReadingRecord.fluency_score + 
+             ReadingRecord.completeness_score + 
+             ReadingRecord.pronunciation_score) / 4
+        ).label('average_score')
+    ).join(ReadingRecord, User.id == ReadingRecord.user_id)\
+    .group_by(User.id)\
+    .order_by(db.text('average_score DESC'))\
+    .limit(10)\
+    .all()
+    
+    return jsonify([{
+        'username': username,
+        'average_score': round(float(average_score), 2)
+    } for username, average_score in leaderboard])
+
+@app.route("/api/topic/leaderboard")
+@login_required
+def get_topic_leaderboard():
+    # 获取Topic练习的用户平均分排行榜
+    leaderboard = db.session.query(
+        User.username,
+        db.func.avg(
+            (TopicRecord.grammar_score + 
+             TopicRecord.content_score + 
+             TopicRecord.relevance_score) / 3
+        ).label('average_score')
+    ).join(TopicRecord, User.id == TopicRecord.user_id)\
+    .group_by(User.id)\
+    .order_by(db.text('average_score DESC'))\
+    .limit(10)\
+    .all()
+    
+    return jsonify([{
+        'username': username,
+        'average_score': round(float(average_score), 2)
+    } for username, average_score in leaderboard])
