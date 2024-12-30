@@ -28,15 +28,15 @@ var phthreshold2 = 60;
 var phthreshold3 = 40;
 var phthreshold4 = 20;
 
-var AudioContext = window.AudioContext || window.webkitAudioContext;;
+var AudioContext = window.AudioContext || window.webkitAudioContext;
 var audioContent;
 var start = false;
 var stop = false;
 var permission = false;
 var reftextval;
-var gumStream; 						//stream from getUserMedia()
-var rec; 							//Recorder.js object
-var audioStream; 					//MediaStreamAudioSourceNode we'll be recording
+var gumStream;
+var rec;
+var audioStream;
 var blobpronun;
 var offsetsarr;
 var tflag = true;
@@ -46,37 +46,34 @@ var t0 = 0;
 var t1;
 var at;
 
+// 初始化
 window.onload = () => {
     if (tflag) {
         tflag = gettoken();
         tflag = false;
     }
-
+    initScoreChart();
 };
 
+// 获取token
 function gettoken() {
     var request = new XMLHttpRequest();
     request.open('POST', '/gettoken', true);
-
-    // Callback function for when request completes
     request.onload = () => {
-        // Extract JSON data from request
         const data = JSON.parse(request.responseText);
         at = data.at;
     }
-
-    //send request
     request.send();
     return false;
 }
 
+// 播放单词音频
 function playword(k) {
     var audio = document.getElementById('ttsaudio');
     audio.playbackRate = 0.5;
     audio.currentTime = (offsetsarr[k] / 1000) + 0;
 
     var stopafter = 10000;
-
     if (k != offsetsarr.length - 1) {
         stopafter = (offsetsarr[k + 1] / 1000) + 0.01;
     }
@@ -88,16 +85,15 @@ function playword(k) {
             this.pause();
             this.currentTime = 0;
             stopafter = 10000;
-            // remove the event listener after you paused the playback
             this.removeEventListener("timeupdate", pausing_function);
             audio.playbackRate = 0.9;
         }
     };
 
     audio.addEventListener("timeupdate", pausing_function);
-
 }
 
+// 播放单个单词
 function playwordind(word) {
     var audio = document.getElementById('ttsaudio');
     audio.playbackRate = 0.5;
@@ -121,6 +117,7 @@ function playwordind(word) {
     audio.addEventListener("ended", ending_function);
 }
 
+// 点击单词播放
 reftext.onclick = function () { handleWordClick() };
 
 function handleWordClick() {
@@ -136,98 +133,85 @@ function handleWordClick() {
         c += wordlist[i].length;
         if (c >= k) {
             playwordind(wordlist[i]);
-            //playword(i);
             break;
         }
         c += 1;
     }
-
 }
 
+// 录音相关功能
 var soundAllowed = function (stream) {
     permission = true;
     audioContent = new AudioContext();
     gumStream = stream;
     audioStream = audioContent.createMediaStreamSource(stream);
     rec = new Recorder(audioStream, { numChannels: 1 })
-
-    //start the recording process
     rec.record()
 }
 
 var soundNotAllowed = function (error) {
-    h.innerHTML = "You must allow your microphone.";
     console.log(error);
+    alert('マイクの使用が許可されていません。');
 }
 
-//function for onclick of hear pronunciation button
+// 听发音按钮
 hbutton.onclick = function () {
     reftextval = reftext.value;
+    if (!reftextval.trim()) {
+        alert("テキストを入力してください。");
+        return;
+    }
+
+    document.getElementById('ttsloader').style.display = "block";
+    document.getElementById('ttsList').style.display = "none";
 
     if (reftextval != lastgettstext) {
-        document.getElementById("ttsloader").style.display = "block";
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/gettts', true);
+        xhr.responseType = "blob";
 
-        var request = new XMLHttpRequest();
-        request.open('POST', '/gettts', true);
-        request.responseType = "blob";
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                var blobpronun = xhr.response;
+                var offsets = xhr.getResponseHeader("offsets");
+                offsetsarr = offsets.substring(1, offsets.length - 1).replace(/ /g, "").split(',').map(Number);
 
-        // Callback function for when request completes
-        request.onload = () => {
-            var blobpronun = request.response;
-            var offsets = request.getResponseHeader("offsets");
-            offsetsarr = offsets.substring(1, offsets.length - 1).replace(/ /g, "").split(',').map(Number);;
+                objectUrlMain = URL.createObjectURL(blobpronun);
 
-            objectUrlMain = URL.createObjectURL(blobpronun);
+                var au = document.createElement('audio');
+                au.controls = true;
+                au.autoplay = true;
+                au.id = "ttsaudio";
+                au.src = objectUrlMain;
 
-            var au = document.createElement('audio');
-            var li = document.createElement('p');
+                var ttsList = document.getElementById('ttsList');
+                ttsList.innerHTML = '';
+                ttsList.appendChild(au);
 
-            //add controls to the <audio> element
-            au.controls = true;
-            au.autoplay = true;
-            au.id = "ttsaudio"
-            au.src = objectUrlMain;
+                document.getElementById('ttsloader').style.display = "none";
+                ttsList.style.display = "block";
 
-            //add the new audio element to li
-            li.appendChild(au);
-
-            //add the li element to the ol
-
-            if (ttsList.hasChildNodes()) {
-                ttsList.lastChild.remove();
+                lastgettstext = reftextval;
+                wordlist = reftextval.split(" ");
+                for (var i = 0; i < wordlist.length; i++) {
+                    getttsforword(wordlist[i]);
+                }
             }
+        };
 
-            ttsList.appendChild(li);
-
-            document.getElementById("ttsloader").style.display = "none";
-        }
         const dat = new FormData();
         dat.append("reftext", reftextval);
-
-        //send request
-        request.send(dat);
-
-        lastgettstext = reftextval;
-
-        wordlist = reftextval.split(" ");
-        for (var i = 0; i < wordlist.length; i++) {
-            getttsforword(wordlist[i]);
-        }
-
+        xhr.send(dat);
     }
-    else {
-        console.log("TTS Audio for given text already exists. You may change ref text");
-    }
-
     return false;
 }
 
+// 获取单词发音
 function getttsforword(word) {
     var request = new XMLHttpRequest();
     request.open('POST', '/getttsforword', true);
     request.responseType = "blob";
 
-    // Callback function for when request completes
     request.onload = () => {
         var blobpronun = request.response;
         var objectUrl = URL.createObjectURL(blobpronun);
@@ -235,105 +219,95 @@ function getttsforword(word) {
     }
     const dat = new FormData();
     dat.append("word", word);
-
-    //send request
     request.send(dat);
 }
 
-//function for onclick of get tongue twister button
+// 随机文本按钮
 ttbutton.onclick = function () {
     var request = new XMLHttpRequest();
     request.open('POST', '/gettonguetwister', true);
 
-    // Callback function for when request completes
     request.onload = () => {
-        // Extract JSON data from request
         const data = JSON.parse(request.responseText);
         reftextval = data.tt;
         reftext.value = reftextval;
         reftext.innerText = reftextval;
-
     }
 
-    //send request
     request.send();
-
     return false;
 }
 
-//function for handling main button clicks
+// 录音按钮
 document.getElementById('buttonmic').onclick = function () {
-    if (reftext.value.length == 0) {
-        alert("Reference Text cannot be empty!");
+    if (!reftext.value.trim()) {
+        alert("参照テキストを入力してください。");
+        return;
+    }
+
+    if (start) {
+        start = false;
+        this.innerHTML = "<span class='fa fa-microphone'></span>新しい録音";
+        this.className = "green-button";
+        rec.stop();
+        gumStream.getAudioTracks()[0].stop();
+        rec.exportWAV(createDownloadLink);
     } else {
-        if (start) {
-            // 停止录音
-            start = false;
-            this.innerHTML = "<span class='fa fa-microphone'></span>新しい録音";
-            this.className = "green-button";
-            rec.stop();
-
-            // 停止麦克风
-            gumStream.getAudioTracks()[0].stop();
-
-            // 创建wav文件并处理
-            rec.exportWAV(createDownloadLink);
-        } else {
-            // 清除之前的录音和评分
-            if (recordingsList.hasChildNodes()) {
-                recordingsList.innerHTML = '';
-            }
-            // 重置评分相关变量
-            omittedwords = "";
-            insertedwords = "";
-            document.getElementById("wih").style.display = "none";
-            wordsinserted.style.display = "none";
-            wordsinserted.innerText = "";
-            wordsomitted.innerText = "";
-
-            // 重置评分表格
-            document.getElementById("summarytable").style.display = "none";
-            wordrow.innerHTML = '';
-            phonemerow.innerHTML = '';
-            scorerow.innerHTML = '';
-            document.getElementById("detailedtable").style.display = "block";
-
-            // 清除分数显示
-            accuracyscore.innerText = "";
-            fluencyscore.innerText = "";
-            completenessscore.innerText = "";
-            pronscore.innerText = "";
-
-            // 开始新录音
-            if (!permission) {
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(soundAllowed)
-                    .catch(soundNotAllowed);
-            } else {
-                audioContent = new AudioContext();
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(function (stream) {
-                        gumStream = stream;
-                        audioStream = audioContent.createMediaStreamSource(stream);
-                        rec = new Recorder(audioStream, { numChannels: 1 });
-                        rec.record();
-                    });
-            }
-
-            start = true;
-            reftext.readonly = true;
-            reftext.disabled = true;
-            ttbutton.disabled = true;
-            ttbutton.className = "btn";
-            reftextval = reftext.value;
-
-            this.innerHTML = "<span class='fa fa-stop'></span>Stop";
-            this.className = "red-button";
+        // 清除之前的录音和评分
+        if (recordingsList) {
+            recordingsList.innerHTML = '';
         }
+
+        // 重置评分相关变量和显示
+        omittedwords = "";
+        insertedwords = "";
+        document.getElementById("wih").style.display = "none";
+        wordsinserted.style.display = "none";
+        wordsinserted.innerText = "";
+        wordsomitted.innerText = "";
+
+        document.getElementById("metrics").style.display = "none";
+        document.getElementById("recordcont").style.display = "none";
+        document.getElementById("recordloader").style.display = "none";
+
+        wordrow.innerHTML = '';
+        phonemerow.innerHTML = '';
+        scorerow.innerHTML = '';
+
+        accuracyscore.innerText = "";
+        fluencyscore.innerText = "";
+        completenessscore.innerText = "";
+        pronscore.innerText = "";
+
+        // 开始新录音
+        if (!permission) {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(soundAllowed)
+                .catch(soundNotAllowed);
+        } else {
+            audioContent = new AudioContext();
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function (stream) {
+                    gumStream = stream;
+                    audioStream = audioContent.createMediaStreamSource(stream);
+                    rec = new Recorder(audioStream, { numChannels: 1 });
+                    rec.record();
+                });
+        }
+
+        start = true;
+        reftext.readonly = true;
+        reftext.disabled = true;
+        ttbutton.disabled = true;
+        ttbutton.className = "btn";
+        reftextval = reftext.value;
+
+        this.innerHTML = "<span class='fa fa-stop'></span>停止";
+        this.className = "red-button";
     }
 };
 
-
+// 填充评分详情
 function fillDetails(words) {
     for (var wi in words) {
         var w = words[wi];
@@ -400,19 +374,19 @@ function fillDetails(words) {
             }
             wordrow.appendChild(tdw);
         }
-
     }
 }
 
+// 填充评分数据
 function fillData(data) {
-    document.getElementById("summarytable").style.display = "flex";
-    document.getElementById("detailedtable").style.display = "block";
+    document.getElementById("recordloader").classList.remove('show');
+    document.getElementById("metrics").classList.add('show');
+
     accuracyscore.innerText = data.AccuracyScore;
     fluencyscore.innerText = data.FluencyScore;
     completenessscore.innerText = data.CompletenessScore;
     pronscore.innerText = parseInt(data.PronScore, 10);
 
-    // 重置表格内容
     wordrow.innerHTML = '';
     phonemerow.innerHTML = '';
     scorerow.innerHTML = '';
@@ -426,255 +400,397 @@ function fillData(data) {
     }
 }
 
+// 处理录音结果
 function createDownloadLink(blob) {
     var url = URL.createObjectURL(blob);
     var au = document.createElement('audio');
     var li = document.createElement('p');
 
-    // Add controls to the <audio> element
     au.controls = true;
     au.src = url;
-
-    // Add the new audio element to li
     li.appendChild(au);
-
-    // Add the li element to the ol
     recordingsList.appendChild(li);
 
-    // Send audio data to the backend
-    var request = new XMLHttpRequest();
-    request.open('POST', '/ackaud', true);
+    document.getElementById('recordloader').classList.add('show');
+    document.getElementById('recordcont').classList.add('show');
 
-    request.onload = () => {
-        const data = JSON.parse(request.responseText);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/ackaud', true);
+
+    xhr.onload = () => {
+        const data = JSON.parse(xhr.responseText);
         if (data.RecognitionStatus == "Success") {
             fillData(data.NBest[0]);
         } else {
-            alert("Did not catch audio properly! Please try again.");
+            alert("音声の認識に失敗しました。もう一度お試しください。");
+            document.getElementById('recordloader').classList.remove('show');
         }
     };
 
-    const data = new FormData();
-    data.append("audio_data", blob, new Date().toISOString());
-    data.append("reftext", reftextval);
+    const formData = new FormData();
+    formData.append("audio_data", blob, new Date().toISOString());
+    formData.append("reftext", reftextval);
 
-    request.send(data);
+    xhr.send(formData);
 }
 
+// Topic页面功能
 document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('generateText').addEventListener('click', function () {
-        console.log("Generate button clicked");  // 调试信息
-
-        // 添加呼吸效果
-        this.classList.add('breathing-button');
-
-        fetch('/generate_text', {
-            method: 'POST'
-        })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Received data:", data);  // 调试信息
-                document.getElementById('reftext').value = data.text;
-
-                // 移除呼吸效果
-                this.classList.remove('breathing-button');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-
-                // 移除呼吸效果
-                this.classList.remove('breathing-button');
-            });
-    });
-});
-
-// 标签页切换功能
-document.addEventListener('DOMContentLoaded', function () {
-    // 标签页切换
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // 移除所有标签页的active类
-            tabs.forEach(t => t.classList.remove('active'));
-            // 给当前点击的标签页添加active类
-            tab.classList.add('active');
-
-            // 隐藏所有内容
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-
-            // 显示对应内容
-            const tabId = tab.getAttribute('data-tab');
-            document.getElementById(tabId + 'Tab').classList.add('active');
-        });
-    });
-
-    // Topic生成功能
     const generateTopicBtn = document.getElementById('generateTopic');
-    generateTopicBtn.addEventListener('click', function () {
-        this.classList.add('breathing-button');
+    const recordTopicBtn = document.getElementById('recordTopic');
+    const topicText = document.getElementById('topicText');
+    const transcribedText = document.getElementById('transcribedText');
+    const grammarCorrection = document.getElementById('grammarCorrection');
+    const feedbackText = document.getElementById('feedbackText');
 
-        fetch('/generate_topic', {
-            method: 'POST'
-        })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('topicText').value = data.topic;
-                this.classList.remove('breathing-button');
-            })
-            .catch(error => {
+    let isRecording = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+
+    // 生成话题
+    if (generateTopicBtn) {
+        generateTopicBtn.addEventListener('click', async function () {
+            try {
+                const response = await fetch('/generate_topic', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                topicText.value = data.topic;
+
+                // 重置其他字段
+                transcribedText.value = '';
+                grammarCorrection.value = '';
+                feedbackText.value = '';
+                document.getElementById('grammarScore').textContent = '-';
+                document.getElementById('contentScore').textContent = '-';
+                document.getElementById('relevanceScore').textContent = '-';
+            } catch (error) {
                 console.error('Error:', error);
-                this.classList.remove('breathing-button');
-            });
-    });
+                alert('トピックの生成に失敗しました。');
+            }
+        });
+    }
 
     // Topic录音功能
-    let topicRecorder;
-    let topicStream;
-    let isRecording = false;
-    let topicChunks = [];
+    if (recordTopicBtn) {
+        recordTopicBtn.addEventListener('click', async function () {
+            if (!topicText.value.trim()) {
+                alert('先にトピックを生成してください。');
+                return;
+            }
 
-    const recordTopicBtn = document.getElementById('recordTopic');
-    const transcribedText = document.getElementById('transcribedText');
-
-    recordTopicBtn.addEventListener('click', function () {
-        if (!isRecording) {
-            // 清空之前的录音数据
-            topicChunks = [];
-            transcribedText.value = '';
-
-            // 开始录音
-            navigator.mediaDevices.getUserMedia({
-                audio: {
-                    channelCount: 1,
-                    sampleRate: 16000,
-                    sampleSize: 16,
-                    volume: 1.0
-                }
-            })
-                .then(stream => {
-                    console.log("获取到音频流");
-                    topicStream = stream;
-
-                    // 尝试使用不同的音频格式
-                    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                        ? 'audio/webm;codecs=opus'
-                        : 'audio/webm';
-
-                    console.log("使用的音频格式:", mimeType);
-
-                    topicRecorder = new MediaRecorder(stream, {
-                        mimeType: mimeType,
-                        audioBitsPerSecond: 128000
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            channelCount: 1,
+                            sampleRate: 16000,
+                            sampleSize: 16,
+                            volume: 1
+                        }
                     });
 
-                    console.log("创建MediaRecorder成功:", topicRecorder.state);
+                    mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/webm;codecs=opus',
+                        audioBitsPerSecond: 16000
+                    });
 
-                    topicRecorder.ondataavailable = (e) => {
-                        console.log("收到音频数据:", e.data.size, "bytes");
-                        if (e.data.size > 0) {
-                            topicChunks.push(e.data);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
                         }
                     };
 
-                    topicRecorder.onstop = () => {
-                        console.log("录音停止，开始处理音频数据");
-                        console.log("收集到的音频块数:", topicChunks.length);
+                    mediaRecorder.onstop = async () => {
+                        try {
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            const formData = new FormData();
+                            formData.append('audio', audioBlob, 'recording.webm');
+                            formData.append('topic', topicText.value);
 
-                        if (topicChunks.length === 0) {
-                            console.error("没有收集到音频数据");
-                            transcribedText.value = "録音データがありません";
-                            return;
-                        }
-
-                        // 创建音频blob
-                        const audioBlob = new Blob(topicChunks, { type: mimeType });
-                        console.log("创建的音频Blob大小:", audioBlob.size, "bytes");
-
-                        if (audioBlob.size === 0) {
-                            console.error("音频Blob为空");
-                            transcribedText.value = "録音データが空です";
-                            return;
-                        }
-
-                        // 创建FormData对象
-                        const formData = new FormData();
-                        formData.append('audio', audioBlob, 'recording.webm');
-                        formData.append('topic', document.getElementById('topicText').value);
-
-                        // 显示加载状态
-                        transcribedText.value = '音声を認識しています...';
-                        document.getElementById('grammarCorrection').value = '';
-                        document.getElementById('feedbackText').value = '';
-                        document.getElementById('grammarScore').textContent = '-';
-                        document.getElementById('contentScore').textContent = '-';
-                        document.getElementById('relevanceScore').textContent = '-';
-
-                        // 发送到后端进行语音识别
-                        console.log("开始发送音频数据到服务器");
-                        fetch('/transcribe_audio', {
-                            method: 'POST',
-                            body: formData
-                        })
-                            .then(response => {
-                                console.log("服务器响应状态:", response.status);
-                                if (!response.ok) {
-                                    return response.json().then(data => {
-                                        throw new Error(data.error || '音声認識に失敗しました');
-                                    });
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                console.log("收到识别结果:", data);
-                                if (data.error) {
-                                    transcribedText.value = `音声認識に失敗しました: ${data.error}`;
-                                } else {
-                                    // 显示识别文本
-                                    transcribedText.value = data.text || '音声を検出できませんでした';
-
-                                    // 显示语法纠正
-                                    document.getElementById('grammarCorrection').value = data.grammar_feedback || '';
-
-                                    // 显示评分和反馈
-                                    if (data.topic_feedback) {
-                                        document.getElementById('grammarScore').textContent =
-                                            data.topic_feedback.grammar_score || '-';
-                                        document.getElementById('contentScore').textContent =
-                                            data.topic_feedback.content_score || '-';
-                                        document.getElementById('relevanceScore').textContent =
-                                            data.topic_feedback.relevance_score || '-';
-                                        document.getElementById('feedbackText').value =
-                                            data.topic_feedback.feedback || '';
-                                    }
-                                }
-                            })
-                            .catch(error => {
-                                console.error('音声認識エラー:', error);
-                                transcribedText.value = error.message || '音声認識に失敗しました';
+                            transcribedText.value = '音声を認識しています...';
+                            const response = await fetch('/process_speech', {
+                                method: 'POST',
+                                body: formData
                             });
+
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+
+                            const result = await response.json();
+
+                            if (result.error) {
+                                throw new Error(result.error);
+                            }
+
+                            transcribedText.value = result.transcription || '音声を認識できませんでした。';
+
+                            if (result.grammar_correction) {
+                                grammarCorrection.value = result.grammar_correction;
+                            }
+
+                            if (result.feedback) {
+                                feedbackText.value = result.feedback;
+                            }
+
+                            // 更新分数显示
+                            if (result.scores) {
+                                document.getElementById('grammarScore').textContent =
+                                    result.scores.grammar_score.toFixed(1);
+                                document.getElementById('contentScore').textContent =
+                                    result.scores.content_score.toFixed(1);
+                                document.getElementById('relevanceScore').textContent =
+                                    result.scores.relevance_score.toFixed(1);
+                            }
+
+                        } catch (error) {
+                            console.error('Error:', error);
+                            transcribedText.value = '音声認識に失敗しました。';
+                            alert(error.message || '音声の処理に失敗しました。');
+                        }
                     };
 
-                    // 每500毫秒收集一次数据
-                    topicRecorder.start(500);
-                    console.log("开始录音");
+                    mediaRecorder.start(1000); // 每秒收集一次数据
                     isRecording = true;
-                    this.innerHTML = "<span class='fa fa-stop'></span>停止";
-                    this.className = "red-button";
-                })
-                .catch(error => {
-                    console.error('マイクアクセスエラー:', error);
-                    alert('マイクへのアクセスに失敗しました: ' + error.message);
-                });
-        } else {
-            // 停止录音
-            console.log("停止录音");
-            topicRecorder.stop();
-            topicStream.getTracks().forEach(track => track.stop());
-            isRecording = false;
-            this.innerHTML = "<span class='fa fa-microphone'></span>録音";
-            this.className = "green-button";
-        }
+                    this.innerHTML = '<span class="fa fa-stop"></span>停止';
+                    this.className = 'red-button';
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('マイクの使用が許可されていません。');
+                }
+            } else {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                isRecording = false;
+                this.innerHTML = '<span class="fa fa-microphone"></span>録音';
+                this.className = 'green-button';
+            }
+        });
+    }
+
+    // 生成文本按钮
+    document.getElementById('generateText').addEventListener('click', function () {
+        fetch('/generate_text', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('reftext').value = data.text;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('文章の生成に失敗しました。');
+            });
     });
 });
+
+// 初始化图表
+window.onload = function () {
+    initializeCharts();
+};
+
+// 初始化所有图表
+async function initializeCharts() {
+    try {
+        const response = await fetch('/get_user_scores');
+        if (!response.ok) {
+            throw new Error('Failed to fetch scores');
+        }
+        const data = await response.json();
+
+        // 初始化总体进度图表
+        initScoreChart(data);
+
+        // 初始化朗读分数图表
+        initReadingChart(data);
+
+        // 初始化话题分数图表
+        initTopicChart(data);
+    } catch (error) {
+        console.error('Error initializing charts:', error);
+        document.querySelectorAll('.chart-box').forEach(box => {
+            box.innerHTML = '<p class="error-message">データの読み込みに失敗しました。</p>';
+        });
+    }
+}
+
+// 初始化总体进度图表
+function initScoreChart(data) {
+    const ctx = document.getElementById('scoreChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.dates,
+            datasets: [
+                {
+                    label: '総合スコア',
+                    data: data.total_scores,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'スコア'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '日付'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: '学習進捗'
+                }
+            }
+        }
+    });
+}
+
+// 初始化朗读分数图表
+function initReadingChart(data) {
+    const ctx = document.getElementById('readingChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.dates,
+            datasets: [
+                {
+                    label: '発音',
+                    data: data.pronunciation_scores,
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: '流暢性',
+                    data: data.fluency_scores,
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: '完成度',
+                    data: data.completeness_scores,
+                    borderColor: 'rgb(255, 206, 86)',
+                    tension: 0.1,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'スコア'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '日付'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: '朗読スコア'
+                }
+            }
+        }
+    });
+}
+
+// 初始化话题分数图表
+function initTopicChart(data) {
+    const ctx = document.getElementById('topicChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.dates,
+            datasets: [
+                {
+                    label: '発音',
+                    data: data.topic_pronunciation_scores,
+                    borderColor: 'rgb(153, 102, 255)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: '流暢性',
+                    data: data.topic_fluency_scores,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: '文法',
+                    data: data.topic_grammar_scores,
+                    borderColor: 'rgb(255, 159, 64)',
+                    tension: 0.1,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'スコア'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '日付'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'トピックスコア'
+                }
+            }
+        }
+    });
+}
+

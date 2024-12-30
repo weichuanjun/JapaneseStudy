@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プロフィール - 日本語学習</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .profile-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .user-info {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .study-records {
+            margin-top: 20px;
+        }
+        .record-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        .record-item:hover {
+            background-color: #f9f9f9;
+        }
+        .record-date {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .record-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-right: 10px;
+        }
+        .type-readalong { background-color: #e3f2fd; }
+        .type-practice { background-color: #e8f5e9; }
+        .type-chat { background-color: #fff3e0; }
+        .nav-bar {
+            background: #f8f9fa;
+            padding: 10px 0;
+            margin-bottom: 20px;
+        }
+        .nav-bar a {
+            margin: 0 10px;
+            text-decoration: none;
+            color: #333;
+        }
+        .nav-bar a:hover {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <a href="{{ url_for('index') }}">ホーム</a>
+        <a href="{{ url_for('profile') }}">プロフィール</a>
+        <a href="{{ url_for('logout') }}">ログアウト</a>
+    </div>
+    
+    <div class="profile-container">
+        <div class="user-info">
+            <h2>{{ user.username }}さんのプロフィール</h2>
+            <p>登録日: {{ user.created_at.strftime('%Y年%m月%d日') }}</p>
+        </div>
+        
+        <div class="study-records">
+            <h3>最近の学習記録</h3>
+            {% if study_records %}
+                {% for record in study_records %}
+                <div class="record-item">
+                    <span class="record-type type-{{ record.activity_type }}">
+                        {{ record.activity_type }}
+                    </span>
+                    <span class="record-date">
+                        {{ record.created_at.strftime('%Y/%m/%d %H:%M') }}
+                    </span>
+                    {% if record.score %}
+                    <div>スコア: {{ "%.1f"|format(record.score) }}</div>
+                    {% endif %}
+                    <div>{{ record.content }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>まだ学習記録がありません。</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html> 

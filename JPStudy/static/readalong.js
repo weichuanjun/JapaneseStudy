@@ -1,3 +1,4 @@
+
 var authorizationToken;
 var start = false;
 var stopf = false;
@@ -208,185 +209,68 @@ document.addEventListener("DOMContentLoaded", function () {
             });
     }
 
-    // 初始化变量
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let isRecording = false;
+    // Starts continuous speech recognition.
+    buttonmic.addEventListener("click", function () {
+        if (stopf) {
+            this.innerHTML = "<span class='fa fa-microphone'></span>Start";
+            this.className = "green-button";
 
-    // 初始化语音识别
-    function initializeSpeechRecognition() {
-        if (!authorizationToken) {
-            console.error('Authorization token not available');
-            return;
+            initvars();
+            gettoken();
+            id++;
+            getstory(id);
         }
-
-        try {
-            const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authorizationToken, region);
-            speechConfig.speechRecognitionLanguage = "ja-JP";
-
-            const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-            recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
-
-            recognizer.recognized = function (s, e) {
-                if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-                    processRecognizedText(e.result.text);
-                }
-            };
-
-            recognizer.recognizing = function (s, e) {
-                if (e.result.text) {
-                    updateCurrentRecognition(e.result.text);
-                }
-            };
-
-            recognizer.canceled = function (s, e) {
-                if (e.reason === SpeechSDK.CancellationReason.Error) {
-                    console.error('Recognition error:', e.errorDetails);
-                    restartRecognition();
-                }
-            };
-
-        } catch (error) {
-            console.error('Error initializing speech recognition:', error);
-            alert('音声認識の初期化に失敗しました。');
+        else if (start) {
+            stoppingfunction();
         }
-    }
+        else {
+            start = true;
+            this.innerHTML = "<span class='fa fa-stop'></span>Stop";
+            this.className = "red-button";
 
-    // 开始录音
-    async function startRecording() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            audioChunks = [];
+            getnextsentence();
+            var prevwords = [];
 
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
-            };
+            var audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
 
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                await processAudioData(audioBlob);
-            };
-
-            mediaRecorder.start(1000); // 每秒收集一次数据
-            isRecording = true;
-
-            // 同时启动语音识别
-            if (recognizer) {
-                recognizer.startContinuousRecognitionAsync();
-            }
-        } catch (error) {
-            console.error('Error starting recording:', error);
-            alert('マイクの使用が許可されていません。');
-        }
-    }
-
-    // 停止录音
-    function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.stop();
-            mediaRecorder.stream.getTracks().forEach(track => track.stop());
-        }
-
-        if (recognizer) {
-            recognizer.stopContinuousRecognitionAsync();
-        }
-
-        isRecording = false;
-    }
-
-    // 处理录音数据
-    async function processAudioData(audioBlob) {
-        const formData = new FormData();
-        formData.append('audio_data', audioBlob);
-        formData.append('reftext', document.getElementById('reftext').value);
-
-        try {
-            const response = await fetch('/ackaud', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                throw new Error('Server response was not ok');
+            var speechConfig;
+            if (authorizationToken) {
+                speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authorizationToken, region);
+            } else {
+                console.log("authToken problem");
             }
 
-            const result = await response.json();
-            displayResults(result);
-        } catch (error) {
-            console.error('Error processing audio:', error);
-            alert('音声の処理に失敗しました。');
-        }
-    }
+            speechConfig.speechRecognitionLanguage = language;
+            reco = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+            var phraseListGrammar = SpeechSDK.PhraseListGrammar.fromRecognizer(reco);
+            phraseListGrammar.addPhrase(story);
 
-    // 显示结果
-    function displayResults(data) {
-        if (!data || !data.NBest || data.NBest.length === 0) {
-            alert('評価結果を取得できませんでした。');
-            return;
-        }
+            // Before beginning speech recognition, setup the callbacks to be invoked when an event occurs.
 
-        const result = data.NBest[0];
-
-        // 更新分数显示
-        document.getElementById('accuracyscore').textContent = result.AccuracyScore.toFixed(1);
-        document.getElementById('fluencyscore').textContent = result.FluencyScore.toFixed(1);
-        document.getElementById('completenessscore').textContent = result.CompletenessScore.toFixed(1);
-        document.getElementById('pronscore').textContent = result.PronScore.toFixed(1);
-
-        // 显示详细评分
-        const wordrow = document.getElementById('wordrow');
-        const phonemerow = document.getElementById('phonemerow');
-        const scorerow = document.getElementById('scorerow');
-
-        wordrow.innerHTML = '';
-        phonemerow.innerHTML = '';
-        scorerow.innerHTML = '';
-
-        if (result.Words) {
-            result.Words.forEach(word => {
-                // 添加单词行
-                const wordCell = document.createElement('td');
-                wordCell.textContent = word.Word;
-                wordCell.style.backgroundColor = word.ErrorType === 'None' ? 'lightgreen' : 'red';
-                wordrow.appendChild(wordCell);
-
-                // 添加音素和分数
-                if (word.Phonemes) {
-                    word.Phonemes.forEach(phoneme => {
-                        const phonemeCell = document.createElement('td');
-                        phonemeCell.textContent = phoneme.Phoneme;
-                        phonemerow.appendChild(phonemeCell);
-
-                        const scoreCell = document.createElement('td');
-                        scoreCell.textContent = phoneme.AccuracyScore.toFixed(1);
-                        scorerow.appendChild(scoreCell);
-                    });
+            // The event recognizing signals that an intermediate recognition result is received.
+            // You will receive one or more recognizing events as a speech phrase is recognized, with each containing
+            // more recognized speech. The event will contain the text for the recognition since the last phrase was recognized.
+            reco.recognizing = function (s, e) {
+                //window.console.log(e);
+                var curwords = e.result.text.split(" ");
+                //console.log(curwords);
+                for (var i = prevwords.length; i < curwords.length; i++) {
+                    var curword = curwords[i];
+                    match(curword);
                 }
-            });
-        }
+                prevwords = curwords;
+            };
 
-        // 显示评分区域
-        document.getElementById('metrics').style.display = 'block';
-    }
+            // The event recognized signals that a final recognition result is received.
+            // This is the final event that a phrase has been recognized.
+            // For continuous recognition, you will get one recognized event for each phrase recognized.
+            reco.recognized = function (s, e) {
+                //window.console.log(e);
+                prevwords = [];
+            };
 
-    // 录音按钮事件处理
-    document.getElementById('buttonmic').addEventListener('click', function () {
-        if (!document.getElementById('reftext').value.trim()) {
-            alert('参照テキストを入力してください。');
-            return;
-        }
-
-        if (!isRecording) {
-            this.innerHTML = '<span class="fa fa-stop"></span>停止';
-            this.className = 'red-button';
-            startRecording();
-        } else {
-            this.innerHTML = '<span class="fa fa-microphone"></span>新しい録音';
-            this.className = 'green-button';
-            stopRecording();
+            // Starts recognition
+            reco.startContinuousRecognitionAsync();
         }
     });
 

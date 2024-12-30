@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>発音評価</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src='https://kit.fontawesome.com/a076d05399.js'></script>
+</head>
+
+<body>  
+    <div class="main-container">
+        <h1 class="page-title">ビジネス日本語 発音トレーニング</h1>
+        
+        <div class="container" id="formcontainer">
+            <form id="reftextform">
+                <textarea id="reftext" rows="3" cols="80" name="reftext" maxlength="160" autofocus placeholder="参照テキストを入力してください..."></textarea>
+            </form>
+        </div>
+
+        <div class="button-group">
+            <button id="randomtt" class="blue-button">
+                <span class="fa fa-random"></span>ビジネス日本語</button>
+            <button id="buttonhear" class="h-button">
+                <span class="fas fa-headphones"></span>発音を学ぶ</button>
+            <button id="buttonmic" class="green-button">
+                <span class="fa fa-microphone"></span>録音</button>
+        </div>
+
+        <div class="container" id="ttscont" style="display: none;">
+            <div id="ttsList"></div>
+            <div class="container" id="ttsloader" style="display: none;">
+                <div id="loader"></div>
+            </div> 
+        </div>
+
+        <div class="container" id="recordcont" style="display: none;">
+            <div id="recordingsList"></div>
+            <div class="container" id="recordloader" style="display: none;">
+                <div id="loader"></div>
+            </div>
+            <div id="metrics" class="animate-bottom" style="display: none;">
+                <div class="results-container">
+                    <div id="summarytable">
+                        <table>
+                            <tr>
+                                <th>正確性スコア</th>
+                                <th>流暢性スコア</th>
+                                <th>完成度スコア</th>
+                                <th>発音スコア</th>
+                                <th id="woh">省略された単語</th>
+                                <th id="wih">追加された単語</th>
+                            </tr>
+                            <tr>
+                                <td id="accuracyscore"></td>
+                                <td id="fluencyscore"></td>
+                                <td id="completenessscore"></td>
+                                <td id="pronscore"></td>
+                                <td id="wordsomitted"></td>
+                                <td id="wordsinserted"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="detailed-results">
+                    <div id="detailedtable">
+                        <table>
+                            <tr id="wordrow"></tr>
+                            <tr id="phonemerow"></tr>
+                            <tr id="scorerow"></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer id="footeralert">マイクの使用を許可してください。</footer>
+    
+    <script src="{{ url_for('static', filename='index.js') }}"></script>
+    <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
+</body>
+</html>
