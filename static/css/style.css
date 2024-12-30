@@ -229,42 +229,161 @@ button i {
 }
 
 #summarytable {
-    border-spacing: 5px;
-    margin: 5px;
+    border-spacing: 0;
+    margin: 20px auto;
     display: none;
     justify-content: center;
     align-items: center;
+    width: 100%;
+    max-width: 600px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
 }
 
-#summarytable table,
+#summarytable table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
 #summarytable th,
 #summarytable td {
-    border: 1px solid lightgrey;
-    border-collapse: collapse;
-    padding: 5px;
+    padding: 12px 16px;
     text-align: center;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#summarytable th {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+#summarytable td {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--primary-dark);
 }
 
 #detailedtable {
-    margin: 5px;
-    border-spacing: 5px;
-    overflow-x: auto;
-    display: block;
-    justify-content: center;
-    align-items: center;
+    margin: 20px auto;
+    border-spacing: 0;
+    width: 100%;
+    max-width: 800px;
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
 }
 
 #detailedtable table {
-    margin: auto;
+    width: 100%;
+    border-collapse: collapse;
 }
 
-#detailedtable table,
 #detailedtable th,
 #detailedtable td {
+    padding: 10px 14px;
     text-align: center;
-    border: 1px solid lightgrey;
-    border-collapse: collapse;
-    padding: 5px;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+#detailedtable th {
+    position: sticky;
+    top: 0;
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    font-weight: 500;
+    font-size: 0.9rem;
+    z-index: 1;
+}
+
+#wordrow td {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+#wordrow td[style*="background-color: lightgreen"] {
+    background-color: var(--success-color) !important;
+    color: white;
+}
+
+#wordrow td[style*="background-color: red"] {
+    background-color: var(--error-color) !important;
+    color: white;
+}
+
+#wordrow td[style*="background-color: orange"] {
+    background-color: #FFB74D !important;
+    color: white;
+}
+
+#phonemerow td[style*="background-color: green"] {
+    background-color: var(--success-color) !important;
+    color: white;
+}
+
+#phonemerow td[style*="background-color: lightgreen"] {
+    background-color: var(--primary-light) !important;
+    color: var(--primary-dark);
+}
+
+#phonemerow td[style*="background-color: yellow"] {
+    background-color: #FFE082 !important;
+    color: var(--text-primary);
+}
+
+#phonemerow td[style*="background-color: red"] {
+    background-color: var(--error-color) !important;
+    color: white;
+}
+
+#scorerow td {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+#wordsomitted,
+#wordsinserted {
+    margin: 10px 0;
+    padding: 12px 16px;
+    background-color: var(--secondary-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+#wih {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 16px;
+}
+
+#detailedtable::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#detailedtable::-webkit-scrollbar-track {
+    background: var(--secondary-color);
+    border-radius: 4px;
+}
+
+#detailedtable::-webkit-scrollbar-thumb {
+    background: var(--primary-light);
+    border-radius: 4px;
+}
+
+#detailedtable::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
 }
 
 #ttsloader {
