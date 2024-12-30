@@ -40,7 +40,8 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             session['user_id'] = user.id
-            return redirect(url_for('index'))
+            session['username'] = user.username
+            return redirect(url_for('index', active_tab='dashboard'))
         else:
             return render_template('login.html', error='ユーザー名またはパスワードが正しくありません')
     
@@ -76,7 +77,8 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html")
+    active_tab = request.args.get('active_tab', 'dashboard')
+    return render_template("index.html", active_tab=active_tab)
 
 # 保存阅读练习记录
 def save_reading_record(user_id, content, scores):
@@ -562,15 +564,16 @@ def get_topic_feedback(text, topic):
     "grammar_score": 70,
     "content_score": 80,
     "relevance_score": 90,
-    "feedback": "改善点をここに書いてください"
+    "feedback": "改善点をここに書いてください。"
 }}
 
 注意事項：
 - 数値は0-100の整数で記入（例：70）
-- feedbackは必ず""で囲む
+- feedbackは必ず"で囲む
 - 改行は入れない
 - 余計な説明は一切加えない
-- 上記のJSONフォーマットを厳密に守る"""
+- 上記のJSONフォーマットを厳密に守る
+- 「」『』【】などの日本語の記号は使わない"""
 
     payload = {
         "model": "llama3.1:8b",
@@ -579,12 +582,12 @@ def get_topic_feedback(text, topic):
     }
 
     try:
-        logging.info(f"发送评分请求，话题：{topic}，回答：{text}")
+        logging.info(f"[Topic Feedback] 发送评分请求 - Topic: {topic}, Answer: {text}")
         response = requests.post(url, json=payload)
         response.raise_for_status()
         result = response.json()
         feedback_text = result.get("response", "")
-        logging.info(f"收到原始响应：{feedback_text}")
+        logging.info(f"[Topic Feedback] 收到原始响应：{feedback_text}")
         
         try:
             # 清理和规范化 JSON 字符串
@@ -593,77 +596,107 @@ def get_topic_feedback(text, topic):
             # 1. 提取 JSON 对象
             json_match = re.search(r'\{.*?\}', feedback_text, re.DOTALL)
             if not json_match:
+                logging.error("[Topic Feedback] 未找到JSON对象")
                 raise ValueError("JSON not found in response")
             
             json_str = json_match.group()
+            logging.info(f"[Topic Feedback] 提取的JSON字符串：{json_str}")
             
             # 2. 清理JSON字符串
-            json_str = re.sub(r'\s+', ' ', json_str).strip()  # 删除多余的空白和换行
-            json_str = re.sub(r'「|」', '"', json_str)  # 替换日文引号
+            # 删除多余的空白和换行
+            json_str = re.sub(r'\s+', ' ', json_str).strip()
+            logging.info(f"[Topic Feedback] 清理空白后：{json_str}")
             
-            logging.info(f"清理后的 JSON 字符串：{json_str}")
+            # 替换所有日文引号和标点
+            json_str = re.sub(r'[「」『』【】、。，．]', '', json_str)
+            logging.info(f"[Topic Feedback] 清理日文标点后：{json_str}")
             
-            # 3. 解析 JSON
-            feedback_json = json.loads(json_str)
+            # 3. 提取各个字段
+            scores = {}
+            for key in ['grammar_score', 'content_score', 'relevance_score']:
+                match = re.search(rf'"{key}"\s*:\s*(\d+)', json_str)
+                if match:
+                    scores[key] = int(match.group(1))
+                    logging.info(f"[Topic Feedback] 提取{key}: {scores[key]}")
+            
+            # 提取feedback
+            feedback_match = re.search(r'"feedback"\s*:\s*"([^"]+)"', json_str)
+            feedback = ""
+            if feedback_match:
+                feedback = feedback_match.group(1)
+                # 移除所有引号和日文标点
+                feedback = re.sub(r'[「」『』【】、。，．]', '', feedback)
+                logging.info(f"[Topic Feedback] 提取feedback: {feedback}")
             
             # 4. 构建结果
-            def parse_score(value):
-                try:
-                    score = int(str(value).replace('-', '0'))
-                    return max(0, min(100, score))
-                except (ValueError, TypeError):
-                    return 0
-            
             result = {
-                "grammar_score": parse_score(feedback_json.get("grammar_score", 0)),
-                "content_score": parse_score(feedback_json.get("content_score", 0)),
-                "relevance_score": parse_score(feedback_json.get("relevance_score", 0)),
-                "feedback": str(feedback_json.get("feedback", "評価を生成できませんでした"))
+                "grammar_score": scores.get('grammar_score', 0),
+                "content_score": scores.get('content_score', 0),
+                "relevance_score": scores.get('relevance_score', 0),
+                "feedback": feedback if feedback else "評価を生成できませんでした"
             }
             
-            logging.info(f"最终处理的结果：{result}")
+            # 验证分数范围
+            for key in ["grammar_score", "content_score", "relevance_score"]:
+                result[key] = max(0, min(100, result[key]))
+            
+            logging.info(f"[Topic Feedback] 最终结果：{result}")
             return result
             
         except (json.JSONDecodeError, ValueError) as e:
-            logging.error(f"解析反馈时出错: {str(e)}")
-            logging.error(f"原始文本: {feedback_text}")
+            logging.error(f"[Topic Feedback] 解析反馈时出错: {str(e)}")
+            logging.error(f"[Topic Feedback] 原始文本: {feedback_text}")
             
             # 尝试备用解析方法
             try:
+                logging.info("[Topic Feedback] 尝试使用备用解析方法")
                 # 提取分数
-                scores = []
+                scores = {}
                 score_patterns = [
                     (r'grammar_score"?\s*:\s*(\d+)', 'grammar_score'),
                     (r'content_score"?\s*:\s*(\d+)', 'content_score'),
                     (r'relevance_score"?\s*:\s*(\d+)', 'relevance_score')
                 ]
                 
-                extracted_scores = {}
                 for pattern, key in score_patterns:
                     match = re.search(pattern, feedback_text)
                     if match:
-                        extracted_scores[key] = int(match.group(1))
+                        scores[key] = int(match.group(1))
+                        logging.info(f"[Topic Feedback] 备用方法提取{key}: {scores[key]}")
                 
                 # 提取feedback
-                feedback_match = re.search(r'feedback"?\s*:\s*"([^"]+)"', feedback_text)
-                feedback = feedback_match.group(1) if feedback_match else "評価を生成できませんでした"
+                feedback = ""
+                feedback_patterns = [
+                    r'feedback"?\s*:\s*"([^"]+)"',
+                    r'改善点[：:]\s*(.+?)(?=\n|$)',
+                    r'アドバイス[：:]\s*(.+?)(?=\n|$)'
+                ]
+                
+                for pattern in feedback_patterns:
+                    match = re.search(pattern, feedback_text, re.DOTALL)
+                    if match:
+                        feedback = match.group(1).strip()
+                        # 移除所有引号和日文标点
+                        feedback = re.sub(r'[「」『』【】、。，．]', '', feedback)
+                        logging.info(f"[Topic Feedback] 备用方法提取feedback: {feedback}")
+                        break
                 
                 result = {
-                    "grammar_score": extracted_scores.get("grammar_score", 0),
-                    "content_score": extracted_scores.get("content_score", 0),
-                    "relevance_score": extracted_scores.get("relevance_score", 0),
-                    "feedback": feedback
+                    "grammar_score": scores.get("grammar_score", 0),
+                    "content_score": scores.get("content_score", 0),
+                    "relevance_score": scores.get("relevance_score", 0),
+                    "feedback": feedback if feedback else "評価を生成できませんでした"
                 }
                 
                 # 验证分数范围
                 for key in ["grammar_score", "content_score", "relevance_score"]:
                     result[key] = max(0, min(100, result[key]))
                 
-                logging.info(f"备用解析结果：{result}")
+                logging.info(f"[Topic Feedback] 备用方法最终结果：{result}")
                 return result
                 
             except Exception as e2:
-                logging.error(f"备用解析也失败: {str(e2)}")
+                logging.error(f"[Topic Feedback] 备用解析也失败: {str(e2)}")
                 return {
                     "grammar_score": 0,
                     "content_score": 0,
@@ -672,7 +705,7 @@ def get_topic_feedback(text, topic):
                 }
                 
     except Exception as e:
-        logging.error(f"获取反馈时出错: {str(e)}")
+        logging.error(f"[Topic Feedback] 获取反馈时出错: {str(e)}")
         return {
             "grammar_score": 0,
             "content_score": 0,

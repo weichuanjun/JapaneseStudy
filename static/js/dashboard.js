@@ -254,6 +254,15 @@ async function loadLeaderboards() {
     }
 }
 
+// 刷新dashboard数据
+function refreshDashboard() {
+    if (document.getElementById('dashboardTab').classList.contains('active')) {
+        loadReadingRecords();
+        loadTopicRecords();
+        loadLeaderboards();
+    }
+}
+
 // 初始化dashboard
 document.addEventListener('DOMContentLoaded', () => {
     const dashboardTab = document.getElementById('dashboardTab');
@@ -263,15 +272,39 @@ document.addEventListener('DOMContentLoaded', () => {
         topicChart = initTopicChart();
 
         // 加载数据
-        loadReadingRecords();
-        loadTopicRecords();
-        loadLeaderboards();
+        refreshDashboard();
 
         // 设置定期刷新
-        setInterval(() => {
-            loadReadingRecords();
-            loadTopicRecords();
-            loadLeaderboards();
-        }, 300000); // 每5分钟刷新一次
+        setInterval(refreshDashboard, 300000); // 每5分钟刷新一次
+
+        // 监听标签切换
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabId = e.target.getAttribute('data-tab');
+
+                // 更新URL，但不刷新页面
+                const url = new URL(window.location);
+                url.searchParams.set('active_tab', tabId);
+                window.history.pushState({}, '', url);
+
+                // 切换标签显示
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.getElementById(tabId + 'Tab').classList.add('active');
+
+                // 更新导航栏active状态
+                document.querySelectorAll('.nav-links a').forEach(a => {
+                    a.classList.remove('active');
+                });
+                e.target.classList.add('active');
+
+                // 如果切换到dashboard，刷新数据
+                if (tabId === 'dashboard') {
+                    refreshDashboard();
+                }
+            });
+        });
     }
 }); 

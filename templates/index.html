@@ -260,7 +260,7 @@
 </div>
 
 <!-- 文章を読む Tab -->
-<div id="readTab" class="tab-content active">
+<div id="readTab" class="tab-content {% if active_tab == 'read' %}active{% endif %}">
     <div class="container" id="ttscont">
     </div>
 
@@ -331,7 +331,7 @@
 </div>
 
 <!-- Topic Tab -->
-<div id="topicTab" class="tab-content">
+<div id="topicTab" class="tab-content {% if active_tab == 'topic' %}active{% endif %}">
     <div class="container">
         <textarea id="topicText" rows="3" cols="80" placeholder="ここにトピックが表示されます..."></textarea>
     </div>
@@ -377,11 +377,11 @@
 </div>
 
 <!-- 練習 Tab -->
-<div id="practiceTab" class="tab-content">
+<div id="practiceTab" class="tab-content {% if active_tab == 'practice' %}active{% endif %}">
     <!-- 将来的に追加する練習コンテンツ -->
 </div>
 
-<footer id=footeralert>マイクの使用を許可してください。</footer>
+<footer id=footeralert> DTC </footer>
 {% endblock %}
 
 {% block scripts %}
