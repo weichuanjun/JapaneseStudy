@@ -265,16 +265,12 @@
     </div>
 </div>
 
-<!-- 文章を読む Tab -->
+<!-- 读文章 Tab -->
 <div id="readTab" class="tab-content {% if active_tab == 'read' %}active{% endif %}">
-    <div class="container" id="ttscont">
-    </div>
-
-    <div class=container id="formcontainer">
+    <div class="container" id="formcontainer">
         <form id="reftextform">
             <textarea id="reftext" rows="3" cols="80" name="reftext" maxlength="160" autofocus placeholder="ここに参照テキストを入力してください..."></textarea>
         </form>
-        <br>
     </div>
 
     <div class="button-container">
@@ -288,51 +284,48 @@
             <span class="fa fa-microphone"></span>新しい録音</button>
     </div>
 
-    <div class="container" id="recordcont">
+    <!-- 默认隐藏的组件 -->
+    <div class="container dynamic-content" id="ttscont">
         <div id="ttsList"></div>
-        <div class="container" id="ttsloader">
+        <div id="ttsloader">
             <div id="loader"></div>
         </div>
-        <div id="recordingsList"></div>
+    </div>
 
-        <div class="container" id="recordloader">
+    <div class="container dynamic-content" id="recordcont">
+        <div id="recordingsList"></div>
+        <div id="recordloader">
             <div id="loader"></div>
         </div>
-        
-        <div id="metrics" class="animate-bottom">
-            <div class=container>
-                <div id="summarytable">
-                    <table>
-                        <tr>
-                            <th>正確性スコア</th>
-                            <th>流暢さスコア</th>
-                            <th>完全性スコア</th>
-                            <th>発音スコア</th>
-                            <th id="woh">省略された単語</th>
-                            <th id="wih">余分に話された単語</th>
-                        </tr>
-                        <tr>
-                            <td id="accuracyscore"></td>
-                            <td id="fluencyscore"></td>
-                            <td id="completenessscore"></td>
-                            <td id="pronscore"></td>
-                            <td id="wordsomitted"></td>
-                            <td id="wordsinserted"></td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-            
-            <div class="container">
-                <div id="detailedtable">
-                    <table>
-                        <tr id="wordrow"></tr>
-                        <tr id="phonemerow"></tr>
-                        <tr id="scorerow"></tr>
-                    </table>
-                </div>
-            </div>
-        </div>
+    </div>
+
+    <div id="summarytable" class="dynamic-content">
+        <table>
+            <tr>
+                <th>正確性スコア</th>
+                <th>流暢さスコア</th>
+                <th>完全性スコア</th>
+                <th>発音スコア</th>
+                <th id="woh">省略された単語</th>
+                <th id="wih">余分に話された単語</th>
+            </tr>
+            <tr>
+                <td id="accuracyscore"></td>
+                <td id="fluencyscore"></td>
+                <td id="completenessscore"></td>
+                <td id="pronscore"></td>
+                <td id="wordsomitted"></td>
+                <td id="wordsinserted"></td>
+            </tr>
+        </table>
+    </div>
+
+    <div id="detailedtable" class="dynamic-content">
+        <table>
+            <tr id="wordrow"></tr>
+            <tr id="phonemerow"></tr>
+            <tr id="scorerow"></tr>
+        </table>
     </div>
 </div>
 

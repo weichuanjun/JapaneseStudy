@@ -146,18 +146,21 @@ function handleWordClick() {
 
 var soundAllowed = function (stream) {
     permission = true;
-    audioContent = new AudioContext();
     gumStream = stream;
+    audioContent = new AudioContext();
     audioStream = audioContent.createMediaStreamSource(stream);
-    rec = new Recorder(audioStream, { numChannels: 1 })
+    rec = new Recorder(audioStream, { numChannels: 1 });
+    rec.record();
 
-    //start the recording process
-    rec.record()
+    // 更新按钮状态
+    start = true;
+    document.getElementById('buttonmic').innerHTML = "<span class='fa fa-stop'></span>停止";
+    document.getElementById('buttonmic').className = "red-button";
 }
 
 var soundNotAllowed = function (error) {
-    h.innerHTML = "You must allow your microphone.";
-    console.log(error);
+    console.log('Error getting audio stream:', error);
+    alert('Error getting audio stream: ' + error.message);
 }
 
 //function for onclick of hear pronunciation button
@@ -166,8 +169,8 @@ hbutton.onclick = function () {
 
     if (reftextval != lastgettstext) {
         document.getElementById("ttsloader").style.display = "block";
-        document.getElementById("ttsList").style.display = "flex"; // 确保列表容器显示
-        document.getElementById("ttscont").style.display = "block"; // 确保外层容器显示
+        document.getElementById("ttscont").classList.add('show');
+        document.getElementById("ttsList").classList.add('show');
 
         var request = new XMLHttpRequest();
         request.open('POST', '/gettts', true);
@@ -221,9 +224,8 @@ hbutton.onclick = function () {
 
     }
     else {
-        // 即使文本没有变化，也要确保音频组件可见
-        document.getElementById("ttsList").style.display = "flex";
-        document.getElementById("ttscont").style.display = "block";
+        document.getElementById("ttscont").classList.add('show');
+        document.getElementById("ttsList").classList.add('show');
         console.log("TTS Audio for given text already exists. You may change ref text");
     }
 
@@ -273,146 +275,139 @@ ttbutton.onclick = function () {
 document.getElementById('buttonmic').onclick = function () {
     if (reftext.value.length == 0) {
         alert("Reference Text cannot be empty!");
-    } else {
-        if (start) {
-            // 停止录音
-            start = false;
-            this.innerHTML = "<span class='fa fa-microphone'></span>新しい録音";
-            this.className = "green-button";
+        return;
+    }
+
+    if (start) {
+        // 停止录音
+        start = false;
+        this.innerHTML = "<span class='fa fa-microphone'></span>新しい録音";
+        this.className = "green-button";
+
+        if (rec) {
             rec.stop();
-
             // 停止麦克风
-            gumStream.getAudioTracks()[0].stop();
-
+            if (gumStream) {
+                gumStream.getAudioTracks()[0].stop();
+            }
             // 创建wav文件并处理
             rec.exportWAV(createDownloadLink);
+        }
+    } else {
+        // 清除之前的录音和评分
+        if (recordingsList.hasChildNodes()) {
+            recordingsList.innerHTML = '';
+        }
+        // 重置评分相关变量
+        omittedwords = "";
+        insertedwords = "";
+        document.getElementById("wih").style.display = "none";
+        wordsinserted.style.display = "none";
+        wordsinserted.innerText = "";
+        wordsomitted.innerText = "";
+
+        // 重置评分表格
+        document.getElementById("summarytable").classList.remove('show');
+        wordrow.innerHTML = '';
+        phonemerow.innerHTML = '';
+        scorerow.innerHTML = '';
+        document.getElementById("detailedtable").classList.remove('show');
+
+        // 清除分数显示
+        accuracyscore.innerText = "";
+        fluencyscore.innerText = "";
+        completenessscore.innerText = "";
+        pronscore.innerText = "";
+
+        // 显示录音相关组件
+        document.getElementById("recordcont").classList.add('show');
+        document.getElementById("recordingsList").classList.add('show');
+
+        // 开始新录音
+        if (!permission) {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(soundAllowed)
+                .catch(soundNotAllowed);
         } else {
-            // 清除之前的录音和评分
-            if (recordingsList.hasChildNodes()) {
-                recordingsList.innerHTML = '';
-            }
-            // 重置评分相关变量
-            omittedwords = "";
-            insertedwords = "";
-            document.getElementById("wih").style.display = "none";
-            wordsinserted.style.display = "none";
-            wordsinserted.innerText = "";
-            wordsomitted.innerText = "";
-
-            // 重置评分表格
-            document.getElementById("summarytable").style.display = "none";
-            wordrow.innerHTML = '';
-            phonemerow.innerHTML = '';
-            scorerow.innerHTML = '';
-            document.getElementById("detailedtable").style.display = "block";
-
-            // 清除分数显示
-            accuracyscore.innerText = "";
-            fluencyscore.innerText = "";
-            completenessscore.innerText = "";
-            pronscore.innerText = "";
-
-            // 显示录音相关组件
-            document.getElementById("recordcont").style.display = "block";
-            document.getElementById("recordingsList").style.display = "block";
-
-            // 开始新录音
-            if (!permission) {
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(soundAllowed)
-                    .catch(soundNotAllowed);
-            } else {
-                audioContent = new AudioContext();
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(function (stream) {
-                        gumStream = stream;
-                        audioStream = audioContent.createMediaStreamSource(stream);
-                        rec = new Recorder(audioStream, { numChannels: 1 });
-                        rec.record();
-                    });
-            }
-
-            start = true;
-            this.innerHTML = "<span class='fa fa-stop'></span>停止";
-            this.className = "red-button";
+            gumStream = null;
+            audioContent = new AudioContext();
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(soundAllowed)
+                .catch(soundNotAllowed);
         }
     }
-};
+}
 
 
 function fillDetails(words) {
+    // 创建表格容器
+    var tableContainer = document.createElement('div');
+    tableContainer.className = 'table-container';
+
     for (var wi in words) {
         var w = words[wi];
-        var countp = 0;
 
         if (w.ErrorType == "Omission") {
             omittedwords += w.Word;
             omittedwords += ', ';
 
-            var tdda = document.createElement('td');
-            tdda.innerText = '-';
-            phonemerow.appendChild(tdda);
+            // 创建单词单元
+            var unit = document.createElement('div');
+            unit.className = 'word-unit';
 
-            var tddb = document.createElement('td');
-            tddb.innerText = '-';
-            scorerow.appendChild(tddb);
+            var wordCell = document.createElement('div');
+            wordCell.className = 'word-cell';
+            // 只取第一个斜杠前的内容
+            wordCell.innerText = w.Word.split('/')[0];
+            wordCell.style.backgroundColor = "orange"; // CSS会自动覆盖这个颜色
 
-            var tdw = document.createElement('td');
-            tdw.innerText = w.Word;
-            tdw.style.backgroundColor = "orange";
-            wordrow.appendChild(tdw);
+            var scoreCell = document.createElement('div');
+            scoreCell.className = 'score-cell';
+            scoreCell.innerText = '-';
+
+            unit.appendChild(wordCell);
+            unit.appendChild(scoreCell);
+            tableContainer.appendChild(unit);
         }
         else if (w.ErrorType == "Insertion") {
             insertedwords += w.Word;
             insertedwords += ', ';
         }
         else if (w.ErrorType == "None" || w.ErrorType == "Mispronunciation") {
-            for (var phonei in w.Phonemes) {
-                var p = w.Phonemes[phonei]
+            // 创建单词单元
+            var unit = document.createElement('div');
+            unit.className = 'word-unit';
 
-                var tdp = document.createElement('td');
-                tdp.innerText = p.Phoneme;
-                if (p.AccuracyScore >= phthreshold1) {
-                    tdp.style.backgroundColor = "green";
-                }
-                else if (p.AccuracyScore >= phthreshold2) {
-                    tdp.style.backgroundColor = "lightgreen";
-                }
-                else if (p.AccuracyScore >= phthreshold3) {
-                    tdp.style.backgroundColor = "yellow";
-                }
-                else {
-                    tdp.style.backgroundColor = "red";
-                }
-                phonemerow.appendChild(tdp);
+            var wordCell = document.createElement('div');
+            wordCell.className = 'word-cell';
+            // 只取第一个斜杠前的内容
+            wordCell.innerText = w.Word.split('/')[0];
 
-                var tds = document.createElement('td');
-                tds.innerText = p.AccuracyScore;
-                scorerow.appendChild(tds);
-                countp = Number(phonei) + 1;
-            }
-            var tdw = document.createElement('td');
-            tdw.innerText = w.Word;
-            var x = document.createElement("SUP");
-            var t = document.createTextNode(w.AccuracyScore);
-            x.appendChild(t);
-            tdw.appendChild(x);
-            tdw.colSpan = countp;
             if (w.ErrorType == "None") {
-                tdw.style.backgroundColor = "lightgreen";
+                wordCell.style.backgroundColor = "lightgreen"; // CSS会自动覆盖这个颜色
+            } else {
+                wordCell.style.backgroundColor = "red"; // CSS会自动覆盖这个颜色
             }
-            else {
-                tdw.style.backgroundColor = "red";
-            }
-            wordrow.appendChild(tdw);
-        }
 
+            var scoreCell = document.createElement('div');
+            scoreCell.className = 'score-cell';
+            scoreCell.innerText = w.AccuracyScore;
+
+            unit.appendChild(wordCell);
+            unit.appendChild(scoreCell);
+            tableContainer.appendChild(unit);
+        }
     }
+
+    // 清空并添加新内容
+    wordrow.innerHTML = '';
+    scorerow.innerHTML = '';
+    wordrow.appendChild(tableContainer);
 }
 
 function fillData(data) {
-    document.getElementById("summarytable").style.display = "flex";
-    document.getElementById("detailedtable").style.display = "block";
+    document.getElementById("summarytable").classList.add('show');
+    document.getElementById("detailedtable").classList.add('show');
     accuracyscore.innerText = data.AccuracyScore;
     fluencyscore.innerText = data.FluencyScore;
     completenessscore.innerText = data.CompletenessScore;
@@ -689,3 +684,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
+
+// 在获取评分结果时
+function showResults(data) {
+    document.getElementById('summarytable').classList.add('show');
+    document.getElementById('detailedtable').classList.add('show');
+    // ... 其他代码 ...
+}
+
+// 在需要隐藏组件时
+function hideComponents() {
+    document.getElementById('ttscont').classList.remove('show');
+    document.getElementById('recordcont').classList.remove('show');
+    document.getElementById('summarytable').classList.remove('show');
+    document.getElementById('detailedtable').classList.remove('show');
+}

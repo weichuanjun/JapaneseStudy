@@ -57,7 +57,7 @@
 .nav-link {
     color: var(--text-secondary);
     text-decoration: none;
-    font-size: 0.95rem;
+    font-size: 1.1rem;
     padding: 8px 16px;
     border-radius: 6px;
     transition: all 0.3s ease;
@@ -91,6 +91,7 @@ body {
     padding-top: 50px;
     margin-top: 0;
     background-color: white;
+    font-size: 16px;
 }
 
 #reftexthead {
@@ -110,24 +111,60 @@ body {
     max-width: 100%;
 }
 
-#ttscont {
-    background-color: transparent;
-}
-
+#ttscont,
 #recordcont {
     background-color: transparent;
+    padding: 10px;
+    margin: 3px 0;
+    border: none;
+    box-shadow: none;
 }
 
+#ttsList,
 #recordingsList {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
+    width: 100%;
+    margin: 10px 0;
 }
 
-#ttsList {
+#formcontainer {
+    background-color: transparent;
+    padding: 10px;
+    margin: 10px 0;
+    border: none;
+    box-shadow: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 音频容器样式 */
+.audio-container {
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 5px 0;
+    padding: 10px;
+    background-color: var(--secondary-color);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.audio-label {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    min-width: 100px;
+    text-align: right;
+}
+
+.audio-player {
+    flex: 1;
+    max-width: 400px;
 }
 
 /* 文本区域样式 */
@@ -137,7 +174,7 @@ textarea {
     border: none;
     border-radius: 8px;
     background-color: var(--secondary-color);
-    font-size: 14px;
+    font-size: 1.1rem;
     font-family: inherit;
     resize: vertical;
     min-height: 100px;
@@ -145,6 +182,7 @@ textarea {
     transition: all 0.2s ease;
     box-sizing: border-box;
     margin: 0;
+    line-height: 1.6;
 }
 
 textarea:focus {
@@ -154,16 +192,19 @@ textarea:focus {
 }
 
 .button-container {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    margin: 16px auto;
+    padding: 0;
     width: 100%;
     text-align: center;
-    margin: 10px 0;
-    padding: 15px 0;
-    border-radius: 12px;
 }
 
 button {
     padding: 8px 16px;
-    font-size: 14px;
+    font-size: 1.1rem;
     font-family: inherit;
     border-radius: 6px;
     text-decoration: none;
@@ -259,130 +300,124 @@ button i {
     background-color: var(--primary-light);
     color: var(--primary-dark);
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: 1.1rem;
 }
 
 #summarytable td {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     font-weight: 600;
     color: var(--primary-dark);
 }
 
 #detailedtable {
     margin: 20px auto;
-    border-spacing: 0;
     width: 100%;
     max-width: 800px;
-    max-height: 400px;
-    overflow-y: auto;
-    display: none;
-    background-color: white;
+    background-color: var(--secondary-color);
     border-radius: 12px;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
+    padding: 16px;
 }
 
-#detailedtable table {
+.table-container {
     width: 100%;
-    border-collapse: collapse;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
-#detailedtable th,
-#detailedtable td {
-    padding: 10px 14px;
+.word-unit {
+    width: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: white;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.word-cell {
+    width: 100%;
+    padding: 8px;
     text-align: center;
-    border: none;
-    border-bottom: 1px solid var(--border-color);
-    white-space: nowrap;
-}
-
-#detailedtable th {
-    position: sticky;
-    top: 0;
-    background-color: var(--primary-light);
-    color: var(--primary-dark);
-    font-weight: 500;
-    font-size: 0.9rem;
-    z-index: 1;
-}
-
-#wordrow td {
     font-size: 1rem;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-#wordrow td[style*="background-color: lightgreen"] {
+.score-cell {
+    width: 100%;
+    padding: 4px 8px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    background-color: var(--secondary-color);
+}
+
+/* 颜色覆盖 */
+.word-cell[style*="background-color: lightgreen"] {
     background-color: var(--success-color) !important;
-    color: white;
+    color: var(--text-primary);
 }
 
-#wordrow td[style*="background-color: red"] {
+.word-cell[style*="background-color: red"] {
     background-color: var(--error-color) !important;
-    color: white;
+    color: var(--text-primary);
 }
 
-#wordrow td[style*="background-color: orange"] {
-    background-color: #FFB74D !important;
-    color: white;
-}
-
-#phonemerow td[style*="background-color: green"] {
-    background-color: var(--success-color) !important;
-    color: white;
-}
-
-#phonemerow td[style*="background-color: lightgreen"] {
+.word-cell[style*="background-color: orange"] {
     background-color: var(--primary-light) !important;
     color: var(--primary-dark);
 }
 
-#phonemerow td[style*="background-color: yellow"] {
-    background-color: #FFE082 !important;
+#wordrow td {
+    font-size: 1.1rem;
+    font-weight: 500;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#wordrow td[style*="background-color: lightgreen"] {
+    background-color: var(--success-color) !important;
     color: var(--text-primary);
 }
 
-#phonemerow td[style*="background-color: red"] {
+#wordrow td[style*="background-color: red"] {
     background-color: var(--error-color) !important;
-    color: white;
+    color: var(--text-primary);
+}
+
+#wordrow td[style*="background-color: orange"] {
+    background-color: var(--primary-light) !important;
+    color: var(--primary-dark);
 }
 
 #scorerow td {
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     color: var(--text-secondary);
+    padding-top: 8px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 16px;
 }
 
-#wordsomitted,
-#wordsinserted {
-    margin: 10px 0;
-    padding: 12px 16px;
-    background-color: var(--secondary-color);
-    border-radius: 8px;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-}
-
-#wih {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-top: 16px;
-}
-
-#detailedtable::-webkit-scrollbar {
-    width: 8px;
+/* 自定义滚动条样式 */
+.table-container::-webkit-scrollbar {
     height: 8px;
 }
 
-#detailedtable::-webkit-scrollbar-track {
+.table-container::-webkit-scrollbar-track {
     background: var(--secondary-color);
     border-radius: 4px;
 }
 
-#detailedtable::-webkit-scrollbar-thumb {
+.table-container::-webkit-scrollbar-thumb {
     background: var(--primary-light);
     border-radius: 4px;
 }
 
-#detailedtable::-webkit-scrollbar-thumb:hover {
+.table-container::-webkit-scrollbar-thumb:hover {
     background: var(--primary-color);
 }
 
@@ -537,7 +572,7 @@ footer {
 
 .chart-title {
     color: var(--text-primary);
-    font-size: 1.1rem;
+    font-size: 1.3rem;
     font-weight: 500;
     margin: 0;
 }
@@ -595,7 +630,7 @@ footer {
 
 .leaderboard-title {
     color: var(--text-primary);
-    font-size: 1.25rem;
+    font-size: 1.4rem;
     font-weight: 600;
     margin-bottom: 24px;
     padding-bottom: 16px;
@@ -626,7 +661,7 @@ footer {
 
 .leaderboard-table th {
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -757,7 +792,7 @@ footer {
     background-color: var(--primary-light);
     color: var(--primary-dark);
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding: 10px 14px;
@@ -768,7 +803,7 @@ footer {
 .records-table td {
     padding: 10px 14px;
     border-bottom: 1px solid var(--border-color);
-    font-size: 0.9rem;
+    font-size: 1.1rem;
 }
 
 .records-table tr {
@@ -844,7 +879,7 @@ footer {
 
 .popup-title {
     color: var(--text-primary);
-    font-size: 1.2rem;
+    font-size: 1.4rem;
     font-weight: 600;
 }
 
@@ -880,7 +915,7 @@ footer {
     font-weight: 500;
     color: var(--text-secondary);
     margin-bottom: 10px;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
 }
 
 /* 弹出窗口中的文本样式 */
@@ -893,6 +928,7 @@ footer {
     margin-bottom: 15px;
     white-space: pre-wrap;
     border: none;
+    font-size: 1.1rem;
 }
 
 .popup-scores {
@@ -917,13 +953,13 @@ footer {
 
 .score-label {
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     margin-bottom: 5px;
 }
 
 .score-value {
     color: var(--primary-dark);
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     font-weight: 600;
 }
 
@@ -1038,6 +1074,8 @@ footer {
     border-radius: 8px;
     transition: all 0.2s ease;
     box-sizing: border-box;
+    font-size: 1.1rem;
+    line-height: 1.6;
 }
 
 #topicText:focus,
@@ -1049,7 +1087,140 @@ footer {
     box-shadow: none;
 }
 
+/* 读文章页面组件默认状态 */
+#ttscont,
+#recordcont,
+#recordingsList,
+#ttsList,
+#ttsloader,
+#recordloader {
+    display: none;
+}
+
+/* 结果组件默认状态 */
+#summarytable,
+#detailedtable {
+    display: none;
+}
+
+/* 在需要时显示组件 */
+#ttscont.show,
+#recordcont.show,
+#recordingsList.show,
+#ttsList.show,
+#ttsloader.show,
+#recordloader.show {
+    display: block !important;
+}
+
+/* 结果表格显示逻辑 */
+#summarytable.show {
+    display: table !important;
+    width: 100%;
+    margin: 20px auto;
+}
+
+#detailedtable.show {
+    display: table !important;
+    width: 100%;
+    margin: 20px auto;
+}
+
+/* 调整组件显示顺序 */
+#readTab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#formcontainer {
+    order: 1;
+    width: 100%;
+    display: block;
+}
+
+.button-container {
+    order: 2;
+    display: flex;
+}
+
+#ttscont {
+    order: 3;
+    margin: 0 0 10px 0;
+    width: 100%;
+}
+
+#recordcont {
+    order: 4;
+    margin: 10px 0 0 0;
+    width: 100%;
+}
+
+#summarytable {
+    order: 5;
+    width: 100%;
+}
+
+#detailedtable {
+    order: 6;
+    width: 100%;
+}
+
+/* 标签页内容的基本显示逻辑 */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
 /* 读文章页面组件初始状态 */
+#readTab:not(.active) {
+    display: none !important;
+}
+
+#readTab:not(.active) #ttscont,
+#readTab:not(.active) #recordcont,
+#readTab:not(.active) #recordingsList,
+#readTab:not(.active) #ttsList,
+#readTab:not(.active) #ttsloader,
+#readTab:not(.active) #recordloader,
+#readTab:not(.active) #summarytable,
+#readTab:not(.active) #detailedtable {
+    display: none !important;
+}
+
+/* Topic页面组件初始状态 */
+#topicTab:not(.active) {
+    display: none !important;
+}
+
+#topicTab:not(.active) .container,
+#topicTab:not(.active) .button-container,
+#topicTab:not(.active) .feedback-section {
+    display: none !important;
+}
+
+/* Dashboard页面组件初始状态 */
+#dashboardTab:not(.active) {
+    display: none !important;
+}
+
+#dashboardTab:not(.active) .dashboard-container {
+    display: none !important;
+}
+
+/* Practice页面组件初始状态 */
+#practiceTab:not(.active) {
+    display: none !important;
+}
+
+#practiceTab:not(.active) .container {
+    display: none !important;
+}
+
+/* 确保组件只在其所属标签页内显示 */
 #ttscont,
 #recordcont,
 #recordingsList,
@@ -1061,29 +1232,189 @@ footer {
     display: none;
 }
 
-/* 练习区域容器样式 */
-#formcontainer {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0;
-    margin: 0;
+#readTab.active #ttscont,
+#readTab.active #recordcont,
+#readTab.active #recordingsList,
+#readTab.active #ttsList,
+#readTab.active #ttsloader,
+#readTab.active #recordloader,
+#readTab.active #summarytable,
+#readTab.active #detailedtable {
+    display: block;
 }
 
-/* 录音文件显示样式 */
+/* 确保录音相关组件只在读文章页面显示 */
+#ttscont,
+#recordcont {
+    display: none;
+}
+
+#readTab.active #ttscont,
+#readTab.active #recordcont {
+    display: block;
+}
+
+/* 读文章页面基础布局 */
+#readTab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* 基础组件显示顺序 */
+#formcontainer {
+    order: 1;
+    width: 100%;
+    display: block;
+}
+
+.button-container {
+    order: 2;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    margin: 16px auto;
+    padding: 0;
+    width: 100%;
+}
+
+/* 音频和结果组件的基础样式 */
+#ttscont,
+#recordcont {
+    width: 100%;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+}
+
+#ttscont {
+    order: 3;
+}
+
+#recordcont {
+    order: 4;
+}
+
+#summarytable {
+    order: 5;
+    width: 100%;
+}
+
+#detailedtable {
+    order: 6;
+    width: 100%;
+}
+
+/* 默认隐藏所有动态组件 */
+.dynamic-content {
+    display: none;
+}
+
+/* 显示动态组件的条件 */
+.dynamic-content.show {
+    display: block;
+}
+
+/* 表格特殊处理 */
+table.dynamic-content.show {
+    display: table;
+}
+
+/* 音频容器样式 */
 .audio-container {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    margin: 10px 0;
+    margin: 5px 0;
     padding: 10px;
     background-color: var(--secondary-color);
     border-radius: 8px;
+    width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .audio-label {
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 1.1rem;
+    min-width: 100px;
+    text-align: right;
+}
+
+.audio-player {
+    flex: 1;
+    max-width: 400px;
+}
+
+/* 默认隐藏的组件 */
+#ttscont,
+#recordcont,
+#recordingsList,
+#ttsList,
+#ttsloader,
+#recordloader,
+#summarytable,
+#detailedtable {
+    display: none !important;
+}
+
+/* 组件显示条件 */
+#ttscont.show {
+    display: block !important;
+}
+
+#recordcont.show {
+    display: block !important;
+}
+
+#recordingsList.show {
+    display: flex !important;
+}
+
+#ttsList.show {
+    display: flex !important;
+}
+
+#summarytable.show {
+    display: table !important;
+}
+
+#detailedtable.show {
+    display: table !important;
+}
+
+/* 加载器显示条件 */
+#ttsloader.show,
+#recordloader.show {
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 音频容器样式 */
+.audio-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 5px 0;
+    padding: 10px;
+    background-color: var(--secondary-color);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.audio-label {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
     min-width: 100px;
     text-align: right;
 }
