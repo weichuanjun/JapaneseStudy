@@ -166,6 +166,8 @@ hbutton.onclick = function () {
 
     if (reftextval != lastgettstext) {
         document.getElementById("ttsloader").style.display = "block";
+        document.getElementById("ttsList").style.display = "flex"; // 确保列表容器显示
+        document.getElementById("ttscont").style.display = "block"; // 确保外层容器显示
 
         var request = new XMLHttpRequest();
         request.open('POST', '/gettts', true);
@@ -179,25 +181,28 @@ hbutton.onclick = function () {
 
             objectUrlMain = URL.createObjectURL(blobpronun);
 
-            var au = document.createElement('audio');
-            var li = document.createElement('p');
+            var container = document.createElement('div');
+            container.className = 'audio-container';
 
-            //add controls to the <audio> element
+            var label = document.createElement('span');
+            label.className = 'audio-label';
+            label.textContent = '正しい発音';
+
+            var au = document.createElement('audio');
+            au.className = 'audio-player';
             au.controls = true;
             au.autoplay = true;
-            au.id = "ttsaudio"
+            au.id = "ttsaudio";
             au.src = objectUrlMain;
 
-            //add the new audio element to li
-            li.appendChild(au);
-
-            //add the li element to the ol
+            container.appendChild(label);
+            container.appendChild(au);
 
             if (ttsList.hasChildNodes()) {
                 ttsList.lastChild.remove();
             }
 
-            ttsList.appendChild(li);
+            ttsList.appendChild(container);
 
             document.getElementById("ttsloader").style.display = "none";
         }
@@ -216,6 +221,9 @@ hbutton.onclick = function () {
 
     }
     else {
+        // 即使文本没有变化，也要确保音频组件可见
+        document.getElementById("ttsList").style.display = "flex";
+        document.getElementById("ttscont").style.display = "block";
         console.log("TTS Audio for given text already exists. You may change ref text");
     }
 
@@ -304,6 +312,10 @@ document.getElementById('buttonmic').onclick = function () {
             completenessscore.innerText = "";
             pronscore.innerText = "";
 
+            // 显示录音相关组件
+            document.getElementById("recordcont").style.display = "block";
+            document.getElementById("recordingsList").style.display = "block";
+
             // 开始新录音
             if (!permission) {
                 navigator.mediaDevices.getUserMedia({ audio: true })
@@ -321,13 +333,7 @@ document.getElementById('buttonmic').onclick = function () {
             }
 
             start = true;
-            reftext.readonly = true;
-            reftext.disabled = true;
-            ttbutton.disabled = true;
-            ttbutton.className = "btn";
-            reftextval = reftext.value;
-
-            this.innerHTML = "<span class='fa fa-stop'></span>Stop";
+            this.innerHTML = "<span class='fa fa-stop'></span>停止";
             this.className = "red-button";
         }
     }
@@ -428,18 +434,24 @@ function fillData(data) {
 
 function createDownloadLink(blob) {
     var url = URL.createObjectURL(blob);
-    var au = document.createElement('audio');
-    var li = document.createElement('p');
 
-    // Add controls to the <audio> element
+    var container = document.createElement('div');
+    container.className = 'audio-container';
+
+    var label = document.createElement('span');
+    label.className = 'audio-label';
+    label.textContent = 'あなたの発音';
+
+    var au = document.createElement('audio');
+    au.className = 'audio-player';
     au.controls = true;
     au.src = url;
 
-    // Add the new audio element to li
-    li.appendChild(au);
+    container.appendChild(label);
+    container.appendChild(au);
 
-    // Add the li element to the ol
-    recordingsList.appendChild(li);
+    recordingsList.appendChild(container);
+    document.getElementById("recordingsList").style.display = "block";
 
     // Send audio data to the backend
     var request = new XMLHttpRequest();
