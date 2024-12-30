@@ -2,83 +2,47 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>{% block title %}日本語学習{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     {% block extra_css %}{% endblock %}
-    <style>
-        .navbar {
-            background-color: #333;
-            padding: 1rem;
-            margin-bottom: 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .nav-links {
-            display: flex;
-            gap: 2rem;
-            list-style: none;
-            margin: 0;
-            padding: 0;
-        }
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: background-color 0.3s;
-            cursor: pointer;
-        }
-        .nav-links a:hover {
-            background-color: #555;
-        }
-        .nav-links a.active {
-            background-color: #4CAF50;
-        }
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            color: white;
-        }
-        .user-menu a {
-            color: white;
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: background-color 0.3s;
-        }
-        .user-menu a:hover {
-            background-color: #555;
-        }
-        .username {
-            color: #4CAF50;
-            font-weight: bold;
-        }
-    </style>
 </head>
 <body>
     <nav class="navbar">
-        <ul class="nav-links">
-            <li><a href="#" data-tab="dashboard" {% if active_tab == 'dashboard' or not active_tab %}class="active"{% endif %}>ダッシュボード</a></li>
-            <li><a href="#" data-tab="read" {% if active_tab == 'read' %}class="active"{% endif %}>文章を読む</a></li>
-            <li><a href="#" data-tab="topic" {% if active_tab == 'topic' %}class="active"{% endif %}>Topic</a></li>
-            <li><a href="#" data-tab="practice" {% if active_tab == 'practice' %}class="active"{% endif %}>練習</a></li>
+        <ul class="nav-list">
+            <li class="nav-item">
+                <a href="{{ url_for('index', active_tab='dashboard') }}" class="nav-link {% if active_tab == 'dashboard' %}active{% endif %}">
+                    <i class="fas fa-chart-line"></i> ダッシュボード
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('index', active_tab='read') }}" class="nav-link {% if active_tab == 'read' %}active{% endif %}">
+                    <i class="fas fa-book-reader"></i> 文章を読む
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('index', active_tab='topic') }}" class="nav-link {% if active_tab == 'topic' %}active{% endif %}">
+                    <i class="fas fa-comments"></i> Topic
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('index', active_tab='practice') }}" class="nav-link {% if active_tab == 'practice' %}active{% endif %}">
+                    <i class="fas fa-tasks"></i> 練習
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('logout') }}" class="nav-link">
+                    <i class="fas fa-sign-out-alt"></i> ログアウト
+                </a>
+            </li>
         </ul>
-        <div class="user-menu">
-            {% if session.get('user_id') %}
-                <span class="username">{{ session.get('username', 'ユーザー') }}</span>
-                <a href="{{ url_for('logout') }}">ログアウト</a>
-            {% else %}
-                <a href="{{ url_for('login') }}">ログイン</a>
-                <a href="{{ url_for('register') }}">新規登録</a>
-            {% endif %}
-        </div>
     </nav>
-    <div class="container">
-        {% block content %}{% endblock %}
-    </div>
-    {% block scripts %}{% endblock %}
+
+    {% block content %}{% endblock %}
+
+    {% block scripts %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    {% endblock %}
 </body>
 </html> 

@@ -216,13 +216,7 @@ async function loadLeaderboards() {
             if (readingData.length === 0) {
                 readingTbody.innerHTML = '<tr><td colspan="3">データがありません</td></tr>';
             } else {
-                readingTbody.innerHTML = readingData.map((user, index) => `
-                    <tr>
-                        <td class="rank">${index + 1}</td>
-                        <td>${user.username}</td>
-                        <td>${user.average_score}</td>
-                    </tr>
-                `).join('');
+                updateLeaderboard(readingData, 'readingLeaderboard');
             }
         }
 
@@ -237,13 +231,7 @@ async function loadLeaderboards() {
             if (topicData.length === 0) {
                 topicTbody.innerHTML = '<tr><td colspan="3">データがありません</td></tr>';
             } else {
-                topicTbody.innerHTML = topicData.map((user, index) => `
-                    <tr>
-                        <td class="rank">${index + 1}</td>
-                        <td>${user.username}</td>
-                        <td>${user.average_score}</td>
-                    </tr>
-                `).join('');
+                updateLeaderboard(topicData, 'topicLeaderboard');
             }
         }
     } catch (error) {
@@ -307,4 +295,39 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-}); 
+});
+
+function updateLeaderboard(data, elementId) {
+    const tbody = document.getElementById(elementId);
+    tbody.innerHTML = '';
+
+    data.forEach((item, index) => {
+        const tr = document.createElement('tr');
+
+        // 添加排名
+        const rankTd = document.createElement('td');
+        const rankSpan = document.createElement('span');
+        rankSpan.className = `rank ${index < 3 ? `rank-${index + 1}` : 'rank-other'}`;
+        rankSpan.textContent = index + 1;
+        rankTd.appendChild(rankSpan);
+
+        // 添加用户名
+        const usernameTd = document.createElement('td');
+        const usernameSpan = document.createElement('span');
+        usernameSpan.className = 'username';
+        usernameSpan.textContent = item.username;
+        usernameTd.appendChild(usernameSpan);
+
+        // 添加分数
+        const scoreTd = document.createElement('td');
+        const scoreSpan = document.createElement('span');
+        scoreSpan.className = 'score';
+        scoreSpan.textContent = item.average_score;
+        scoreTd.appendChild(scoreSpan);
+
+        tr.appendChild(rankTd);
+        tr.appendChild(usernameTd);
+        tr.appendChild(scoreTd);
+        tbody.appendChild(tr);
+    });
+} 
