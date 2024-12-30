@@ -490,23 +490,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // 标签页切换功能
 document.addEventListener('DOMContentLoaded', function () {
-    // 标签页切换
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // 移除所有标签页的active类
-            tabs.forEach(t => t.classList.remove('active'));
-            // 给当前点击的标签页添加active类
-            tab.classList.add('active');
+    // 导航栏切换逻辑
+    const navLinks = document.querySelectorAll('.nav-links a');
+    const tabContents = document.querySelectorAll('.tab-content');
 
-            // 隐藏所有内容
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
 
-            // 显示对应内容
-            const tabId = tab.getAttribute('data-tab');
-            document.getElementById(tabId + 'Tab').classList.add('active');
+            // 移除所有活动状态
+            navLinks.forEach(l => l.classList.remove('active'));
+            tabContents.forEach(tab => tab.classList.remove('active'));
+
+            // 添加新的活动状态
+            link.classList.add('active');
+            const tabId = `${link.getAttribute('data-tab')}Tab`;
+            document.getElementById(tabId).classList.add('active');
         });
     });
 

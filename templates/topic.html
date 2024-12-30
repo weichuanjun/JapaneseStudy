@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}トピック{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/topic.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="topic-selection">
+        <h2>トピックを選択</h2>
+        <div class="topic-grid">
+            <div class="topic-card" data-topic="daily">
+                <h3>日常会話</h3>
+                <p>日常生活で使える表現を練習しましょう</p>
+            </div>
+            <div class="topic-card" data-topic="business">
+                <h3>ビジネス</h3>
+                <p>職場で使える丁寧な表現を学びましょう</p>
+            </div>
+            <div class="topic-card" data-topic="culture">
+                <h3>文化</h3>
+                <p>日本の文化に関する表現を学びましょう</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="practice-area" style="display: none;">
+        <div class="conversation-container">
+            <div id="conversation"></div>
+        </div>
+        <div class="input-area">
+            <textarea id="userInput" placeholder="日本語で返信を入力してください..."></textarea>
+            <button id="submitResponse">送信</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/topic.js') }}"></script>
+{% endblock %} 

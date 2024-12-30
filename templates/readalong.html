@@ -1,34 +1,24 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Read Along</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <meta charset="utf-8" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='readalong.css') }}">
-    <script src='https://kit.fontawesome.com/a076d05399.js'></script>
-</head>
+{% extends "base.html" %}
 
-<body>
-    <div id="warning">
-        <h1 style="font-weight:500;">Speech Recognition Speech SDK not found (microsoft.cognitiveservices.speech.sdk.bundle.js missing).</h1>
-    </div>
-    <div id="totalscorediv">
-        <p id="totalscorep">0</p>
-        <p id="star">&#11088;</p>
-        <div id ="pointsdiv"></div>
-    </div>
+{% block title %}読み上げ{% endblock %}
 
-    <div class="button-container">
-        <button id="buttonmic" class="green-button">
-            <span class="fa fa-microphone"></span>Start</button>
-    </div>
-    
-    <div id="readalongcont">
-        <p id="readalongtext"><span id="textdone"></span><span id="textleft"></span></p>
-    </div>
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='readalong.css') }}">
+{% endblock %}
 
-    <!-- Speech SDK REFERENCE -->
-    <script src="{{ url_for('static', filename='microsoft.cognitiveservices.speech.sdk.bundle.js') }}"></script>
-    <script src="{{ url_for('static', filename='readalong.js') }}"></script>
-</body>
-</html>
+{% block content %}
+<div class="container">
+    <div id="text-display"></div>
+    <div class="controls">
+        <button id="startButton">Start</button>
+        <button id="stopButton" disabled>Stop</button>
+        <button id="nextButton">Next</button>
+    </div>
+    <div id="result"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='microsoft.cognitiveservices.speech.sdk.bundle.js') }}"></script>
+<script src="{{ url_for('static', filename='readalong.js') }}"></script>
+{% endblock %}

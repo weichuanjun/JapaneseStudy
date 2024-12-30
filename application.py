@@ -22,6 +22,10 @@ def index():
 def readalong():
     return render_template("readalong.html")
 
+@app.route("/topic")
+def topic():
+    return render_template("topic.html")
+
 @app.route("/gettoken", methods=["POST"])
 def gettoken():
     fetch_token_url = 'https://%s.api.cognitive.microsoft.com/sts/v1.0/issueToken' %REGION
@@ -431,23 +435,23 @@ def get_grammar_feedback(text):
 def get_topic_feedback(text, topic):
     """获取主题相关的反馈和评分"""
     url = "http://localhost:11434/api/generate"
-    prompt = f"""与えられたトピックに対する回答を評価し、フィードバックを提供してください。
+    prompt = f"""以下の日本語の回答を評価してください。
 
 トピック: {topic}
 回答: {text}
 
 以下の形式で回答してください：
-1. 文法スコア（0-100）
-2. 内容スコア（0-100）
-3. トピックとの関連性スコア（0-100）
+1. 文法の正確性（0-100点）
+2. 内容の充実度（0-100点）
+3. トピックとの関連性（0-100点）
 4. 改善のためのアドバイス（箇条書き）
 
-回答は以下のJSON形式でお願いします：
+回答は以下のJSON形式で出力してください：
 {{
     "grammar_score": 数値,
     "content_score": 数値,
     "relevance_score": 数値,
-    "feedback": "アドバイス文"
+    "feedback": "アドバイス"
 }}"""
 
     payload = {
@@ -460,13 +464,35 @@ def get_topic_feedback(text, topic):
         response = requests.post(url, json=payload)
         response.raise_for_status()
         result = response.json()
-        feedback_text = result.get("response", "{}")
+        feedback_text = result.get("response", "")
+        
         try:
-            # 尝试解析JSON响应
-            feedback_data = json.loads(feedback_text)
-            return feedback_data
-        except json.JSONDecodeError:
-            # 如果无法解析JSON，返回默认值
+            # 尝试直接解析返回的 JSON 字符串
+            import re
+            # 使用正则表达式提取 JSON 部分
+            json_match = re.search(r'\{[^}]+\}', feedback_text)
+            if json_match:
+                feedback_json = json.loads(json_match.group())
+                # 确保所有必要的字段都存在
+                return {
+                    "grammar_score": int(feedback_json.get("grammar_score", 0)),
+                    "content_score": int(feedback_json.get("content_score", 0)),
+                    "relevance_score": int(feedback_json.get("relevance_score", 0)),
+                    "feedback": feedback_json.get("feedback", "評価を生成できませんでした")
+                }
+            else:
+                # 如果无法找到 JSON，手动解析文本
+                scores = re.findall(r'\d+', feedback_text)[:3]  # 提取前三个数字作为分数
+                feedback = re.findall(r'アドバイス[：:](.*?)(?=\n|$)', feedback_text, re.DOTALL)
+                
+                return {
+                    "grammar_score": int(scores[0]) if len(scores) > 0 else 0,
+                    "content_score": int(scores[1]) if len(scores) > 1 else 0,
+                    "relevance_score": int(scores[2]) if len(scores) > 2 else 0,
+                    "feedback": feedback[0].strip() if feedback else "評価を生成できませんでした"
+                }
+        except (json.JSONDecodeError, ValueError, IndexError) as e:
+            logging.error(f"Error parsing feedback: {str(e)}, raw text: {feedback_text}")
             return {
                 "grammar_score": 0,
                 "content_score": 0,
