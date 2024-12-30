@@ -11,10 +11,12 @@
             background-color: #333;
             padding: 1rem;
             margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .nav-links {
             display: flex;
-            justify-content: center;
             gap: 2rem;
             list-style: none;
             margin: 0;
@@ -34,6 +36,26 @@
         .nav-links a.active {
             background-color: #4CAF50;
         }
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: white;
+        }
+        .user-menu a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .user-menu a:hover {
+            background-color: #555;
+        }
+        .username {
+            color: #4CAF50;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -43,6 +65,15 @@
             <li><a href="#" data-tab="topic">Topic</a></li>
             <li><a href="#" data-tab="practice">練習</a></li>
         </ul>
+        <div class="user-menu">
+            {% if session.get('user_id') %}
+                <span class="username">{{ session.get('username', 'ユーザー') }}</span>
+                <a href="{{ url_for('logout') }}">ログアウト</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">ログイン</a>
+                <a href="{{ url_for('register') }}">新規登録</a>
+            {% endif %}
+        </div>
     </nav>
     <div class="container">
         {% block content %}{% endblock %}

@@ -6,36 +6,182 @@ import random
 import azure.cognitiveservices.speech as speechsdk
 import logging
 from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE
-
-from flask import Flask, jsonify, render_template, request, make_response
+from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash
+from models import db, User, ReadingRecord, TopicRecord
+from functools import wraps
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your-secret-key'  # 请更改为随机的密钥
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///japanese_study.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# 配置日志记录
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# 初始化数据库
+db.init_app(app)
+
+# 创建数据库表
+with app.app_context():
+    db.create_all()
+
+# 登录验证装饰器
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
+            session['user_id'] = user.id
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error='ユーザー名またはパスワードが正しくありません')
+    
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if password != confirm_password:
+            return render_template('register.html', error='パスワードが一致しません')
+        
+        if User.query.filter_by(username=username).first():
+            return render_template('register.html', error='このユーザー名は既に使用されています')
+        
+        user = User(username=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect(url_for('login'))
 
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 
-@app.route("/readalong")
-def readalong():
-    return render_template("readalong.html")
+# 保存阅读练习记录
+def save_reading_record(user_id, content, scores):
+    record = ReadingRecord(
+        user_id=user_id,
+        content=content,
+        accuracy_score=scores.get('accuracy_score'),
+        fluency_score=scores.get('fluency_score'),
+        completeness_score=scores.get('completeness_score'),
+        pronunciation_score=scores.get('pronunciation_score'),
+        words_omitted=scores.get('words_omitted'),
+        words_inserted=scores.get('words_inserted')
+    )
+    db.session.add(record)
+    db.session.commit()
 
-@app.route("/topic")
-def topic():
-    return render_template("topic.html")
+# 保存话题练习记录
+def save_topic_record(user_id, topic, response, scores):
+    # 确保 feedback 是字符串
+    if isinstance(scores.get('feedback'), list):
+        feedback = '\n'.join(scores.get('feedback', []))
+    else:
+        feedback = str(scores.get('feedback', ''))
 
-@app.route("/gettoken", methods=["POST"])
-def gettoken():
-    fetch_token_url = 'https://%s.api.cognitive.microsoft.com/sts/v1.0/issueToken' %REGION
-    headers = {
-        'Ocp-Apim-Subscription-Key': SUBSCRIPTION_KEY
-    }
-    response = requests.post(fetch_token_url, headers=headers)
-    access_token = response.text
-    return jsonify({"at":access_token})
+    # 确保 grammar_correction 是字符串
+    grammar_correction = str(scores.get('grammar_correction', ''))
 
+    record = TopicRecord(
+        user_id=user_id,
+        topic=topic,
+        response=response,
+        grammar_score=scores.get('grammar_score', 0),
+        content_score=scores.get('content_score', 0),
+        relevance_score=scores.get('relevance_score', 0),
+        feedback=feedback,
+        grammar_correction=grammar_correction
+    )
+    db.session.add(record)
+    db.session.commit()
+
+@app.route("/ackaud", methods=["POST"])
+@login_required
+def ackaud():
+    f = request.files['audio_data']
+    reftext = request.form.get("reftext")
+    #    f.save(audio)
+    #print('file uploaded successfully')
+
+    # a generator which reads audio data chunk by chunk
+    # the audio_source can be any audio input stream which provides read() method, e.g. audio file, microphone, memory stream, etc.
+    def get_chunk(audio_source, chunk_size=1024):
+        while True:
+            #time.sleep(chunk_size / 32000) # to simulate human speaking rate
+            chunk = audio_source.read(chunk_size)
+            if not chunk:
+                #global uploadFinishTime
+                #uploadFinishTime = time.time()
+                break
+            yield chunk
+
+    # build pronunciation assessment parameters
+    referenceText = reftext
+    pronAssessmentParamsJson = "{\"ReferenceText\":\"%s\",\"GradingSystem\":\"HundredMark\",\"Dimension\":\"Comprehensive\",\"EnableMiscue\":\"True\"}" % referenceText
+    pronAssessmentParamsBase64 = base64.b64encode(bytes(pronAssessmentParamsJson, 'utf-8'))
+    pronAssessmentParams = str(pronAssessmentParamsBase64, "utf-8")
+
+    # build request
+    url = "https://%s.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=%s&usePipelineVersion=0" % (REGION, LANGUAGE)
+    headers = { 'Accept': 'application/json;text/xml',
+                'Connection': 'Keep-Alive',
+                'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
+                'Ocp-Apim-Subscription-Key': SUBSCRIPTION_KEY,
+                'Pronunciation-Assessment': pronAssessmentParams,
+                'Transfer-Encoding': 'chunked',
+                'Expect': '100-continue' }
+
+    #audioFile = open('audio.wav', 'rb')
+    audioFile = f
+    # send request with chunked data
+    response = requests.post(url=url, data=get_chunk(audioFile), headers=headers)
+    #getResponseTime = time.time()
+    audioFile.close()
+
+    #latency = getResponseTime - uploadFinishTime
+    #print("Latency = %sms" % int(latency * 1000))
+
+    # 在获取评分结果后保存记录
+    if response.ok:
+        data = response.json()
+        if data.get('RecognitionStatus') == 'Success':
+            scores = data['NBest'][0]
+            save_reading_record(
+                user_id=session['user_id'],
+                content=reftext,
+                scores={
+                    'accuracy_score': float(scores.get('AccuracyScore', 0)),
+                    'fluency_score': float(scores.get('FluencyScore', 0)),
+                    'completeness_score': float(scores.get('CompletenessScore', 0)),
+                    'pronunciation_score': float(scores.get('PronScore', 0)),
+                    'words_omitted': ','.join([w['Word'] for w in scores.get('Words', []) if w.get('ErrorType') == 'Omission']),
+                    'words_inserted': ','.join([w['Word'] for w in scores.get('Words', []) if w.get('ErrorType') == 'Insertion'])
+                }
+            )
+    
+    return response.json()
 
 @app.route("/gettonguetwister", methods=["POST"])
 def gettonguetwister():
@@ -91,53 +237,6 @@ def getstory():
         return jsonify({"code":201})
     else:
         return jsonify({"code":200,"storyid":id , "storynumelements":len(stories[id]),"story": stories[id]})
-
-@app.route("/ackaud", methods=["POST"])
-def ackaud():
-    f = request.files['audio_data']
-    reftext = request.form.get("reftext")
-    #    f.save(audio)
-    #print('file uploaded successfully')
-
-    # a generator which reads audio data chunk by chunk
-    # the audio_source can be any audio input stream which provides read() method, e.g. audio file, microphone, memory stream, etc.
-    def get_chunk(audio_source, chunk_size=1024):
-        while True:
-            #time.sleep(chunk_size / 32000) # to simulate human speaking rate
-            chunk = audio_source.read(chunk_size)
-            if not chunk:
-                #global uploadFinishTime
-                #uploadFinishTime = time.time()
-                break
-            yield chunk
-
-    # build pronunciation assessment parameters
-    referenceText = reftext
-    pronAssessmentParamsJson = "{\"ReferenceText\":\"%s\",\"GradingSystem\":\"HundredMark\",\"Dimension\":\"Comprehensive\",\"EnableMiscue\":\"True\"}" % referenceText
-    pronAssessmentParamsBase64 = base64.b64encode(bytes(pronAssessmentParamsJson, 'utf-8'))
-    pronAssessmentParams = str(pronAssessmentParamsBase64, "utf-8")
-
-    # build request
-    url = "https://%s.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=%s&usePipelineVersion=0" % (REGION, LANGUAGE)
-    headers = { 'Accept': 'application/json;text/xml',
-                'Connection': 'Keep-Alive',
-                'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
-                'Ocp-Apim-Subscription-Key': SUBSCRIPTION_KEY,
-                'Pronunciation-Assessment': pronAssessmentParams,
-                'Transfer-Encoding': 'chunked',
-                'Expect': '100-continue' }
-
-    #audioFile = open('audio.wav', 'rb')
-    audioFile = f
-    # send request with chunked data
-    response = requests.post(url=url, data=get_chunk(audioFile), headers=headers)
-    #getResponseTime = time.time()
-    audioFile.close()
-
-    #latency = getResponseTime - uploadFinishTime
-    #print("Latency = %sms" % int(latency * 1000))
-
-    return response.json()
 
 @app.route("/gettts", methods=["POST"])
 def gettts():
@@ -278,6 +377,7 @@ def generate_topic():
         return jsonify({"topic": "トピック生成に失敗しました"})
 
 @app.route("/transcribe_audio", methods=["POST"])
+@login_required
 def transcribe_audio():
     logging.info("开始处理音频转写请求")
     
@@ -370,6 +470,22 @@ def transcribe_audio():
             grammar_feedback = get_grammar_feedback(transcribed_text)
             topic_feedback = get_topic_feedback(transcribed_text, request.form.get('topic', ''))
             
+            # 在获取评分和反馈后保存记录
+            topic = request.form.get('topic', '')
+            if result and 'text' in result:
+                save_topic_record(
+                    user_id=session['user_id'],
+                    topic=topic,
+                    response=result['text'],
+                    scores={
+                        'grammar_score': topic_feedback.get('grammar_score', 0),
+                        'content_score': topic_feedback.get('content_score', 0),
+                        'relevance_score': topic_feedback.get('relevance_score', 0),
+                        'feedback': topic_feedback.get('feedback', ''),
+                        'grammar_correction': grammar_feedback
+                    }
+                )
+            
             return jsonify({
                 "text": transcribed_text,
                 "grammar_feedback": grammar_feedback,
@@ -435,18 +551,18 @@ def get_grammar_feedback(text):
 def get_topic_feedback(text, topic):
     """获取主题相关的反馈和评分"""
     url = "http://localhost:11434/api/generate"
-    prompt = f"""以下の日本語の回答を評価してください。
+    prompt = f"""以下の日本語の回答を評価し、JSON形式で返してください。
 
 トピック: {topic}
 回答: {text}
 
-以下の形式で回答してください：
-1. 文法の正確性（0-100点）
-2. 内容の充実度（0-100点）
-3. トピックとの関連性（0-100点）
-4. 改善のためのアドバイス（箇条書き）
+評価基準：
+- grammar_score: 文法の正確性（0-100点）
+- content_score: 内容の充実度（0-100点）
+- relevance_score: トピックとの関連性（0-100点）
+- feedback: 改善のためのアドバイス（箇条書き）
 
-回答は以下のJSON形式で出力してください：
+必ず以下のJSON形式で出力してください。他の説明は不要です：
 {{
     "grammar_score": 数値,
     "content_score": 数値,
@@ -461,10 +577,12 @@ def get_topic_feedback(text, topic):
     }
 
     try:
+        logging.info(f"发送评分请求，话题：{topic}，回答：{text}")
         response = requests.post(url, json=payload)
         response.raise_for_status()
         result = response.json()
         feedback_text = result.get("response", "")
+        logging.info(f"收到原始响应：{feedback_text}")
         
         try:
             # 尝试直接解析返回的 JSON 字符串
@@ -472,27 +590,39 @@ def get_topic_feedback(text, topic):
             # 使用正则表达式提取 JSON 部分
             json_match = re.search(r'\{[^}]+\}', feedback_text)
             if json_match:
-                feedback_json = json.loads(json_match.group())
+                json_str = json_match.group()
+                logging.info(f"提取到的 JSON 字符串：{json_str}")
+                feedback_json = json.loads(json_str)
+                logging.info(f"解析后的 JSON 对象：{feedback_json}")
+                
                 # 确保所有必要的字段都存在
-                return {
+                result = {
                     "grammar_score": int(feedback_json.get("grammar_score", 0)),
                     "content_score": int(feedback_json.get("content_score", 0)),
                     "relevance_score": int(feedback_json.get("relevance_score", 0)),
                     "feedback": feedback_json.get("feedback", "評価を生成できませんでした")
                 }
+                logging.info(f"最终处理的结果：{result}")
+                return result
             else:
+                logging.warning("未找到 JSON 格式的响应，尝试解析文本格式")
                 # 如果无法找到 JSON，手动解析文本
                 scores = re.findall(r'\d+', feedback_text)[:3]  # 提取前三个数字作为分数
+                logging.info(f"提取到的分数：{scores}")
                 feedback = re.findall(r'アドバイス[：:](.*?)(?=\n|$)', feedback_text, re.DOTALL)
+                logging.info(f"提取到的反馈：{feedback}")
                 
-                return {
+                result = {
                     "grammar_score": int(scores[0]) if len(scores) > 0 else 0,
                     "content_score": int(scores[1]) if len(scores) > 1 else 0,
                     "relevance_score": int(scores[2]) if len(scores) > 2 else 0,
                     "feedback": feedback[0].strip() if feedback else "評価を生成できませんでした"
                 }
+                logging.info(f"最终处理的结果：{result}")
+                return result
         except (json.JSONDecodeError, ValueError, IndexError) as e:
-            logging.error(f"Error parsing feedback: {str(e)}, raw text: {feedback_text}")
+            logging.error(f"解析反馈时出错: {str(e)}")
+            logging.error(f"原始文本: {feedback_text}")
             return {
                 "grammar_score": 0,
                 "content_score": 0,
@@ -500,7 +630,7 @@ def get_topic_feedback(text, topic):
                 "feedback": "評価の解析に失敗しました"
             }
     except Exception as e:
-        logging.error(f"Topic feedback error: {e}")
+        logging.error(f"获取反馈时出错: {str(e)}")
         return {
             "grammar_score": 0,
             "content_score": 0,
