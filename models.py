@@ -20,29 +20,30 @@ class User(db.Model):
 
     @property
     def avg_reading_score(self):
-        if not self.reading_records:
-            return 0
-        total_score = 0
-        count = 0
-        for record in self.reading_records:
-            if record.accuracy_score and record.fluency_score and record.completeness_score and record.pronunciation_score:
-                score = (record.accuracy_score + record.fluency_score + record.completeness_score + record.pronunciation_score) / 4
-                total_score += score
-                count += 1
-        return total_score / count if count > 0 else 0
+        """计算阅读练习的平均分"""
+        from sqlalchemy import func
+        result = db.session.query(
+            func.avg(
+                (ReadingRecord.accuracy_score + 
+                 ReadingRecord.fluency_score + 
+                 ReadingRecord.completeness_score + 
+                 ReadingRecord.pronunciation_score) / 4
+            )
+        ).filter(ReadingRecord.user_id == self.id).scalar()
+        return round(float(result or 0), 1)
 
     @property
     def avg_topic_score(self):
-        if not self.topic_records:
-            return 0
-        total_score = 0
-        count = 0
-        for record in self.topic_records:
-            if record.grammar_score and record.content_score and record.relevance_score:
-                score = (record.grammar_score + record.content_score + record.relevance_score) / 3
-                total_score += score
-                count += 1
-        return total_score / count if count > 0 else 0
+        """计算Topic练习的平均分"""
+        from sqlalchemy import func
+        result = db.session.query(
+            func.avg(
+                (TopicRecord.grammar_score + 
+                 TopicRecord.content_score + 
+                 TopicRecord.relevance_score) / 3
+            )
+        ).filter(TopicRecord.user_id == self.id).scalar()
+        return round(float(result or 0), 1)
 
     @property
     def total_practices(self):

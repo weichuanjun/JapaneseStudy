@@ -532,22 +532,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Topic生成功能
     const generateTopicBtn = document.getElementById('generateTopic');
-    generateTopicBtn.addEventListener('click', function () {
-        this.classList.add('breathing-button');
+    if (generateTopicBtn) {
+        generateTopicBtn.addEventListener('click', function () {
+            // 显示加载状态
+            const topicText = document.getElementById('topicText');
+            topicText.value = 'トピックを生成中...';
+            this.classList.add('breathing-button');
 
-        fetch('/generate_topic', {
-            method: 'POST'
-        })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('topicText').value = data.topic;
-                this.classList.remove('breathing-button');
+            fetch('/generate_topic', {
+                method: 'POST'
             })
-            .catch(error => {
-                console.error('Error:', error);
-                this.classList.remove('breathing-button');
-            });
-    });
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('topicText').value = data.topic;
+                    this.classList.remove('breathing-button');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('topicText').value = 'トピック生成に失敗しました';
+                    this.classList.remove('breathing-button');
+                });
+        });
+    }
 
     // Topic录音功能
     let topicRecorder;
@@ -651,27 +657,53 @@ document.addEventListener('DOMContentLoaded', function () {
                                 if (data.error) {
                                     transcribedText.value = `音声認識に失敗しました: ${data.error}`;
                                 } else {
-                                    // 显示识别文本
+                                    // 立即显示识别文本
                                     transcribedText.value = data.text || '音声を検出できませんでした';
 
+                                    // 显示分析中状态
+                                    document.getElementById('grammarCorrection').value = '文法を分析しています...';
+                                    document.getElementById('feedbackText').value = '評価を分析しています...';
+
+                                    // 获取分析结果
+                                    return fetch('/get_analysis', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                            text: data.text,
+                                            topic: document.getElementById('topicText').value
+                                        })
+                                    });
+                                }
+                            })
+                            .then(response => {
+                                if (response && response.ok) {
+                                    return response.json();
+                                }
+                            })
+                            .then(analysisData => {
+                                if (analysisData) {
                                     // 显示语法纠正
-                                    document.getElementById('grammarCorrection').value = data.grammar_feedback || '';
+                                    if (analysisData.grammar_feedback) {
+                                        document.getElementById('grammarCorrection').value = analysisData.grammar_feedback;
+                                    }
 
                                     // 显示评分和反馈
-                                    if (data.topic_feedback) {
+                                    if (analysisData.topic_feedback) {
                                         document.getElementById('grammarScore').textContent =
-                                            data.topic_feedback.grammar_score || '-';
+                                            analysisData.topic_feedback.grammar_score || '-';
                                         document.getElementById('contentScore').textContent =
-                                            data.topic_feedback.content_score || '-';
+                                            analysisData.topic_feedback.content_score || '-';
                                         document.getElementById('relevanceScore').textContent =
-                                            data.topic_feedback.relevance_score || '-';
+                                            analysisData.topic_feedback.relevance_score || '-';
                                         document.getElementById('feedbackText').value =
-                                            data.topic_feedback.feedback || '';
+                                            analysisData.topic_feedback.feedback || '';
                                     }
                                 }
                             })
                             .catch(error => {
-                                console.error('音声認識エラー:', error);
+                                console.error('Error:', error);
                                 transcribedText.value = error.message || '音声認識に失敗しました';
                             });
                     };

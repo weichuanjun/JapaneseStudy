@@ -393,6 +393,8 @@ def transcribe_audio():
         return jsonify({"error": "音声ファイルが見つかりません"}), 400
 
     audio_file = request.files["audio"]
+    topic = request.form.get('topic', '')
+    current_user_id = session['user_id']  # 获取当前用户ID
     logging.info(f"接收到音频文件: {audio_file.filename}, Content-Type: {audio_file.content_type}")
     
     try:
@@ -406,7 +408,7 @@ def transcribe_audio():
         logging.info(f"临时webm文件已保存: {temp_webm}, 大小: {file_size} bytes")
         
         if file_size == 0:
-            raise ValueError("录音文件为空")
+            raise ValueError("録音ファイルが空です")
             
         # 使用ffmpeg将webm转换为wav
         temp_wav = "temp_audio.wav"
@@ -466,37 +468,46 @@ def transcribe_audio():
                 temp_wav,
                 language="ja",
                 task="transcribe",
-                fp16=False,  # 使用FP32以提高兼容性
-                verbose=True  # 显示详细信息
+                fp16=False,
+                verbose=True
             )
             
             transcribed_text = result["text"]
             logging.info(f"语音识别完成，结果: {transcribed_text}")
+
+            # 启动异步任务进行分析
+            from threading import Thread
+            def analyze_text():
+                with app.app_context():  # 确保在应用上下文中执行
+                    try:
+                        # 获取语法纠正和评分
+                        grammar_feedback = get_grammar_feedback(transcribed_text)
+                        topic_feedback = get_topic_feedback(transcribed_text, topic)
+                        
+                        # 保存记录
+                        save_topic_record(
+                            user_id=current_user_id,
+                            topic=topic,
+                            response=transcribed_text,
+                            scores={
+                                'grammar_score': topic_feedback.get('grammar_score', 0),
+                                'content_score': topic_feedback.get('content_score', 0),
+                                'relevance_score': topic_feedback.get('relevance_score', 0),
+                                'feedback': topic_feedback.get('feedback', ''),
+                                'grammar_correction': grammar_feedback
+                            }
+                        )
+                        logging.info(f"成功保存用户 {current_user_id} 的练习记录")
+                    except Exception as e:
+                        logging.error(f"分析过程中出错: {str(e)}", exc_info=True)
+
+            # 启动异步分析
+            Thread(target=analyze_text).start()
             
-            # 获取语法纠正和评分
-            grammar_feedback = get_grammar_feedback(transcribed_text)
-            topic_feedback = get_topic_feedback(transcribed_text, request.form.get('topic', ''))
-            
-            # 在获取评分和反馈后保存记录
-            topic = request.form.get('topic', '')
-            if result and 'text' in result:
-                save_topic_record(
-                    user_id=session['user_id'],
-                    topic=topic,
-                    response=result['text'],
-                    scores={
-                        'grammar_score': topic_feedback.get('grammar_score', 0),
-                        'content_score': topic_feedback.get('content_score', 0),
-                        'relevance_score': topic_feedback.get('relevance_score', 0),
-                        'feedback': topic_feedback.get('feedback', ''),
-                        'grammar_correction': grammar_feedback
-                    }
-                )
-            
+            # 立即返回识别结果
             return jsonify({
                 "text": transcribed_text,
-                "grammar_feedback": grammar_feedback,
-                "topic_feedback": topic_feedback
+                "status": "analyzing"
             })
             
         except ImportError as e:
@@ -527,6 +538,29 @@ def transcribe_audio():
                     logging.info(f"清理临时文件: {temp_file}")
             except Exception as e:
                 logging.error(f"清理临时文件 {temp_file} 时出错: {str(e)}")
+
+# 添加新的路由用于获取分析结果
+@app.route("/get_analysis", methods=["POST"])
+@login_required
+def get_analysis():
+    text = request.json.get('text')
+    topic = request.json.get('topic')
+    
+    if not text:
+        return jsonify({"error": "テキストが見つかりません"}), 400
+        
+    try:
+        # 获取语法纠正和评分
+        grammar_feedback = get_grammar_feedback(text)
+        topic_feedback = get_topic_feedback(text, topic)
+        
+        return jsonify({
+            "grammar_feedback": grammar_feedback,
+            "topic_feedback": topic_feedback
+        })
+    except Exception as e:
+        logging.error(f"获取分析结果时出错: {str(e)}", exc_info=True)
+        return jsonify({"error": "分析に失敗しました"}), 500
 
 def get_grammar_feedback(text):
     """获取语法纠正反馈"""
