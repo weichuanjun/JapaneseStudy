@@ -330,7 +330,7 @@ def generate_japanese_text():
     url = "http://localhost:11434/api/generate"  # 默认 Ollama 端口为 11434
     payload = {
         "model": "llama3.1:8b",  # 使用的模型名称，例如 llama3 或其他可用的模型
-        "prompt": "200字程度の簡単な日本語の文章を書いてください。内容は日語学習者向けで、余計な説明や注釈を含めないでください。",
+        "prompt": "50字程度の簡単な日本語の文章を書いてください。内容は日語学習者向けで、余計な説明や注釈を含めないでください。",
         "stream": False
     }
 

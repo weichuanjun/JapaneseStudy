@@ -428,6 +428,7 @@ function fillData(data) {
 }
 
 function createDownloadLink(blob) {
+    reftextval = reftext.value;
     var url = URL.createObjectURL(blob);
 
     var container = document.createElement('div');
