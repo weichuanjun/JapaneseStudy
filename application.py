@@ -845,5 +845,4 @@ def vocabulary():
     current_user = User.query.get(session['user_id'])
     return render_template('vocabulary.html', 
                          active_tab='vocabulary', 
-                         current_user=current_user,
-                         user_id=session['user_id'])
+                         current_user=current_user)

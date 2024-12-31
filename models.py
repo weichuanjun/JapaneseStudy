@@ -150,4 +150,32 @@ class VocabularyRecord(db.Model):
         return {
             'correct_rate': correct_count / len(records),
             'total_answered': len(records)
+        }
+
+class Vocabulary(db.Model):
+    __tablename__ = 'vocabulary'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    word = db.Column(db.String(100), nullable=False)
+    reading = db.Column(db.String(100), nullable=False)
+    meaning = db.Column(db.String(100), nullable=False)
+    example = db.Column(db.String(500))
+    example_reading = db.Column(db.String(500))
+    example_meaning = db.Column(db.String(500))
+    category = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    @property
+    def serialize(self):
+        return {
+            'id': self.id,
+            'word': self.word,
+            'reading': self.reading,
+            'meaning': self.meaning,
+            'example': self.example,
+            'example_reading': self.example_reading,
+            'example_meaning': self.example_meaning,
+            'category': self.category,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
         } 

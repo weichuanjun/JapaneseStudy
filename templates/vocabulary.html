@@ -1,335 +1,583 @@
 {% extends "base.html" %}
 
-{% block title %}単語学習{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='vocabulary.css') }}">
-<style>
-    .vocabulary-container {
-        max-width: 800px;
-        margin: 30px auto;
-        padding: 20px;
-    }
-
-    .start-section {
-        text-align: center;
-        margin-bottom: 30px;
-        padding: 20px;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-
-    .category-preview {
-        margin-bottom: 20px;
-    }
-
-    .category-preview h2 {
-        color: #333;
-        margin-bottom: 15px;
-    }
-
-    .preview-category-btn {
-        padding: 8px 16px;
-        margin: 5px;
-        border: 2px solid #4CAF50;
-        border-radius: 20px;
-        background-color: white;
-        color: #4CAF50;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-size: 1em;
-    }
-
-    .preview-category-btn.active {
-        background-color: #4CAF50;
-        color: white;
-    }
-
-    .start-btn {
-        padding: 15px 40px;
-        font-size: 1.2em;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 25px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        margin-bottom: 20px;
-    }
-
-    .start-btn:hover {
-        background-color: #45a049;
-        transform: translateY(-2px);
-    }
-
-    .loading-indicator {
-        display: none;
-        text-align: center;
-        margin: 20px 0;
-    }
-
-    .loading-indicator.show {
-        display: block;
-    }
-
-    .loading-spinner {
-        border: 4px solid #f3f3f3;
-        border-radius: 50%;
-        border-top: 4px solid #4CAF50;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 10px;
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    .status-message {
-        color: #666;
-        margin: 10px 0;
-        font-style: italic;
-    }
-
-    .error-message {
-        color: #f44336;
-        margin: 10px 0;
-        padding: 10px;
-        background-color: #ffebee;
-        border-radius: 4px;
-        display: none;
-    }
-
-    .error-message.show {
-        display: block;
-    }
-
-    .main-content {
-        display: none;
-    }
-
-    .main-content.show {
-        display: block;
-        animation: fadeIn 0.5s ease;
-    }
-
-    .category-selector {
-        margin-bottom: 30px;
-        text-align: center;
-    }
-
-    .category-btn {
-        padding: 10px 20px;
-        margin: 5px;
-        border: none;
-        border-radius: 20px;
-        background-color: #f0f0f0;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .category-btn.active {
-        background-color: #4CAF50;
-        color: white;
-    }
-
-    .word-card {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        padding: 30px;
-        text-align: center;
-        margin-bottom: 30px;
-    }
-
-    .word-japanese {
-        font-size: 2.5em;
-        margin-bottom: 10px;
-    }
-
-    .word-reading {
-        font-size: 1.2em;
-        color: #666;
-        margin-bottom: 20px;
-    }
-
-    .options-container {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
-        margin: 20px 0;
-    }
-
-    .option-btn {
-        padding: 15px;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
-        background: white;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-size: 1.1em;
-    }
-
-    .option-btn:hover {
-        background: #f5f5f5;
-    }
-
-    .option-btn.correct {
-        background: #4CAF50;
-        color: white;
-        border-color: #4CAF50;
-    }
-
-    .option-btn.wrong {
-        background: #f44336;
-        color: white;
-        border-color: #f44336;
-    }
-
-    .example-section {
-        margin-top: 20px;
-        padding-top: 20px;
-        border-top: 1px solid #eee;
-        display: none;
-    }
-
-    .example-section.show {
-        display: block;
-        animation: fadeIn 0.5s ease;
-    }
-
-    .stats-section {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        padding: 20px;
-        margin-top: 30px;
-    }
-
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 15px;
-        margin-top: 15px;
-    }
-
-    .stat-item {
-        text-align: center;
-        padding: 15px;
-        background: #f5f5f5;
-        border-radius: 8px;
-    }
-
-    .stat-value {
-        font-size: 1.5em;
-        font-weight: bold;
-        color: #4CAF50;
-    }
-
-    .stat-label {
-        font-size: 0.9em;
-        color: #666;
-        margin-top: 5px;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    .next-btn {
-        display: none;
-        margin: 20px auto;
-        padding: 12px 30px;
-        background: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 25px;
-        cursor: pointer;
-        font-size: 1.1em;
-        transition: all 0.3s ease;
-    }
-
-    .next-btn:hover {
-        background: #45a049;
-        transform: translateY(-2px);
-    }
-
-    .next-btn.show {
-        display: block;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="vocabulary-container" data-user-id="{{ user_id }}">
-    <div class="start-section">
-        <div class="category-preview">
-            <h2>学習カテゴリー</h2>
-            <div class="preview-buttons">
-                <button class="preview-category-btn active" data-category="n5">N5</button>
-                <button class="preview-category-btn" data-category="n4">N4</button>
-                <button class="preview-category-btn" data-category="n3">N3</button>
-                <button class="preview-category-btn" data-category="n2">N2</button>
-                <button class="preview-category-btn" data-category="n1">N1</button>
-                <button class="preview-category-btn" data-category="daily">日常用语</button>
-                <button class="preview-category-btn" data-category="business">商务用语</button>
-            </div>
+<div class="vocabulary-container" data-user-id="{{ current_user.id }}">
+    <div class="category-preview">
+        <h2>学習カテゴリー</h2>
+        <div class="preview-buttons">
+            <button class="preview-category-btn active" data-category="n5">N5</button>
+            <button class="preview-category-btn" data-category="n4">N4</button>
+            <button class="preview-category-btn" data-category="n3">N3</button>
+            <button class="preview-category-btn" data-category="n2">N2</button>
+            <button class="preview-category-btn" data-category="n1">N1</button>
+            <button class="preview-category-btn" data-category="daily">日常用语</button>
+            <button class="preview-category-btn" data-category="business">商务用语</button>
         </div>
+    </div>
+
+    <div class="start-section">
         <button class="start-btn">学習を始める</button>
+    </div>
+
+    <div class="main-content">
         <div class="loading-indicator">
             <div class="loading-spinner"></div>
             <div class="status-message">単語を生成中...</div>
         </div>
-        <div class="error-message"></div>
-    </div>
-
-    <div class="main-content">
-        <div class="category-selector">
-            <button class="category-btn active" data-category="n5">N5</button>
-            <button class="category-btn" data-category="n4">N4</button>
-            <button class="category-btn" data-category="n3">N3</button>
-            <button class="category-btn" data-category="n2">N2</button>
-            <button class="category-btn" data-category="n1">N1</button>
-            <button class="category-btn" data-category="daily">日常用语</button>
-            <button class="category-btn" data-category="business">商务用语</button>
-        </div>
 
         <div class="word-card">
-            <div class="word-japanese"></div>
-            <div class="word-reading"></div>
-            <div class="options-container"></div>
-            <button class="next-btn">次の単語 →</button>
+            <div class="word-header">
+                <span class="word"></span>
+                <button class="favorite-btn" title="添加到单词本">
+                    <i class="fas fa-star"></i>
+                </button>
+            </div>
+            <div class="reading"></div>
+            <div class="options"></div>
             <div class="example-section">
-                <h3>例文</h3>
-                <div class="example-japanese"></div>
+                <div class="example"></div>
                 <div class="example-reading"></div>
                 <div class="example-meaning"></div>
             </div>
+            <div class="result-message"></div>
+            <button class="next-btn" style="display: none;">次の単語</button>
         </div>
+    </div>
 
-        <div class="stats-section">
-            <h3>学習統計</h3>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-value" id="totalWords">0</div>
-                    <div class="stat-label">総単語数</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="correctWords">0</div>
-                    <div class="stat-label">正解数</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="accuracy">0%</div>
-                    <div class="stat-label">正確率</div>
-                </div>
+    <div class="history-section">
+        <h3>学习历史</h3>
+        <div class="history-list">
+            <!-- 历史记录将通过JavaScript动态添加 -->
+        </div>
+    </div>
+</div>
+
+<!-- 单词本弹窗 -->
+<div class="vocabulary-modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>单词本</h2>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="favorites-list">
+                <!-- 收藏的单词将通过JavaScript动态添加 -->
             </div>
         </div>
     </div>
 </div>
+
+<!-- 单词本按钮 -->
+<button class="open-vocabulary-btn">
+    <i class="fas fa-book"></i>
+</button>
+
+<style>
+.vocabulary-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 30px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.category-preview {
+    margin-bottom: 30px;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.category-preview h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 24px;
+    text-align: center;
+}
+
+.preview-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+}
+
+.preview-category-btn {
+    padding: 10px 20px;
+    border: 2px solid #e9ecef;
+    border-radius: 25px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 16px;
+}
+
+.preview-category-btn:hover {
+    background: #f8f9fa;
+    transform: translateY(-2px);
+}
+
+.preview-category-btn.active {
+    background: #4a90e2;
+    color: white;
+    border-color: #4a90e2;
+}
+
+.start-section {
+    text-align: center;
+    margin: 30px 0;
+}
+
+.start-btn {
+    padding: 15px 40px;
+    font-size: 20px;
+    background: #2ecc71;
+    color: white;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(46, 204, 113, 0.2);
+}
+
+.start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(46, 204, 113, 0.3);
+}
+
+.word-card {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.word-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.word {
+    font-size: 36px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.reading {
+    font-size: 24px;
+    color: #7f8c8d;
+    margin-bottom: 30px;
+}
+
+.options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin: 30px 0;
+}
+
+.option-btn {
+    padding: 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 18px;
+}
+
+.option-btn:hover {
+    background: #f8f9fa;
+    transform: translateY(-2px);
+}
+
+.option-btn.correct {
+    background: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.option-btn.incorrect {
+    background: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.example-section {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.example, .example-reading, .example-meaning {
+    margin: 10px 0;
+    line-height: 1.6;
+}
+
+.example {
+    font-size: 20px;
+    color: #2c3e50;
+}
+
+.example-reading {
+    font-size: 16px;
+    color: #7f8c8d;
+}
+
+.example-meaning {
+    font-size: 18px;
+    color: #34495e;
+}
+
+.next-btn {
+    width: 100%;
+    padding: 15px;
+    background: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    margin-top: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 18px;
+}
+
+.next-btn:hover {
+    background: #357abd;
+    transform: translateY(-2px);
+}
+
+.history-section {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.history-section h3 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 20px;
+}
+
+.history-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.3s ease;
+}
+
+.history-item:hover {
+    background-color: #f8f9fa;
+}
+
+.history-item .word-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.history-item .word-text {
+    font-size: 18px;
+    color: #2c3e50;
+}
+
+.history-item .word-meaning {
+    font-size: 14px;
+    color: #7f8c8d;
+    margin-top: 3px;
+}
+
+.history-item .result {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.history-item .result.correct {
+    color: #2ecc71;
+}
+
+.history-item .result.incorrect {
+    color: #e74c3c;
+}
+
+.vocabulary-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    width: 90%;
+    max-width: 900px;
+    height: 90vh;
+    border-radius: 15px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #eee;
+}
+
+.modal-header h2 {
+    color: #2c3e50;
+    font-size: 24px;
+    margin: 0;
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 30px;
+    color: #7f8c8d;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.close-modal:hover {
+    color: #34495e;
+}
+
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.favorites-list {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 10px;
+}
+
+.favorite-item {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+.favorite-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.favorite-item .word-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.favorite-item .word {
+    font-size: 18px;
+    color: #2c3e50;
+}
+
+.favorite-item .reading {
+    font-size: 14px;
+    color: #7f8c8d;
+}
+
+.toggle-details-btn {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: #7f8c8d;
+    transition: all 0.3s ease;
+}
+
+.toggle-details-btn i {
+    font-size: 16px;
+}
+
+.toggle-details-btn:hover {
+    color: #4a90e2;
+    transform: scale(1.1);
+}
+
+.toggle-details-btn.active {
+    color: #4a90e2;
+    transform: rotate(180deg);
+}
+
+.favorite-item .details {
+    font-size: 14px;
+    padding: 8px;
+    background: white;
+    border-radius: 6px;
+    margin-top: 8px;
+}
+
+.favorite-item .meaning {
+    color: #34495e;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.favorite-item .example,
+.favorite-item .example-reading,
+.favorite-item .example-meaning {
+    color: #7f8c8d;
+    margin: 4px 0;
+    font-size: 13px;
+}
+
+.favorite-item .item-footer {
+    margin-top: 8px;
+    text-align: right;
+}
+
+.remove-btn {
+    padding: 4px 8px;
+    font-size: 13px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.remove-btn:hover {
+    background: #c0392b;
+}
+
+.open-vocabulary-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #4a90e2;
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    transition: all 0.3s ease;
+}
+
+.open-vocabulary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0,0,0,0.2);
+}
+
+.message-popup {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 25px;
+    font-size: 16px;
+    z-index: 1100;
+    animation: fadeInOut 3s ease;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, 20px); }
+    10% { opacity: 1; transform: translate(-50%, 0); }
+    90% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -20px); }
+}
+
+.favorite-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 24px;
+    transition: all 0.3s ease;
+    padding: 8px;
+    border-radius: 50%;
+}
+
+.favorite-btn:hover {
+    background-color: rgba(0,0,0,0.05);
+    transform: scale(1.1);
+}
+
+.favorite-btn.active {
+    color: #ffd700;
+    animation: pop 0.3s ease;
+}
+
+@keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.loading-indicator {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #4a90e2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 10px;
+}
+
+.status-message {
+    color: #7f8c8d;
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
 
 <script src="{{ url_for('static', filename='vocabulary.js') }}"></script>
 {% endblock %} 

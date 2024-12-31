@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from models import db, VocabularyRecord
+from models import db, VocabularyRecord, Vocabulary
 import json
 import logging
 import time
@@ -359,4 +359,145 @@ def get_stats():
         return jsonify(stats)
     except Exception as e:
         logging.error(f"获取统计数据时出错: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@vocabulary_bp.route('/api/vocabulary/favorite', methods=['POST'])
+def add_to_favorites():
+    """添加单词到单词本"""
+    logging.info("开始添加单词到单词本")
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data received'}), 400
+            
+        user_id = data.get('user_id')
+        word = data.get('word')
+        reading = data.get('reading')
+        meaning = data.get('meaning')
+        example = data.get('example')
+        example_reading = data.get('example_reading')
+        example_meaning = data.get('example_meaning')
+        category = data.get('category')
+        
+        if not all([user_id, word, reading, meaning, category]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # 检查是否已经存在
+        existing = Vocabulary.query.filter_by(
+            user_id=user_id,
+            word=word
+        ).first()
+        
+        if existing:
+            return jsonify({'status': 'already exists'}), 200
+        
+        vocabulary = Vocabulary(
+            user_id=user_id,
+            word=word,
+            reading=reading,
+            meaning=meaning,
+            example=example,
+            example_reading=example_reading,
+            example_meaning=example_meaning,
+            category=category
+        )
+        
+        db.session.add(vocabulary)
+        db.session.commit()
+        
+        logging.info(f"成功添加单词到单词本: {word}")
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        logging.error(f"添加单词到单词本时出错: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@vocabulary_bp.route('/api/vocabulary/favorite', methods=['DELETE'])
+def remove_from_favorites():
+    """从单词本中删除单词"""
+    logging.info("开始从单词本中删除单词")
+    try:
+        word = request.args.get('word')
+        user_id = request.args.get('user_id')
+        
+        if not all([word, user_id]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        vocabulary = Vocabulary.query.filter_by(
+            word=word,
+            user_id=user_id
+        ).first()
+        
+        if not vocabulary:
+            return jsonify({'error': 'Word not found'}), 404
+        
+        db.session.delete(vocabulary)
+        db.session.commit()
+        
+        logging.info(f"成功从单词本中删除单词: {vocabulary.word}")
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        logging.error(f"从单词本中删除单词时出错: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@vocabulary_bp.route('/api/vocabulary/favorites', methods=['GET'])
+def get_favorites():
+    """获取用户的单词本"""
+    logging.info("开始获取单词本")
+    try:
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
+        
+        favorites = Vocabulary.query.filter_by(
+            user_id=user_id
+        ).order_by(Vocabulary.created_at.desc()).all()
+        
+        result = [word.serialize for word in favorites]
+        
+        logging.info(f"成功获取单词本，共 {len(result)} 个单词")
+        return jsonify(result)
+    except Exception as e:
+        logging.error(f"获取单词本时出错: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@vocabulary_bp.route('/api/vocabulary/history', methods=['GET'])
+def get_history():
+    """获取用户的学习历史"""
+    logging.info("开始获取学习历史")
+    try:
+        user_id = request.args.get('user_id')
+        limit = request.args.get('limit', 20, type=int)
+        
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
+        
+        # 获取历史记录，并关联单词本中的意思
+        records = db.session.query(
+            VocabularyRecord,
+            Vocabulary.meaning
+        ).outerjoin(
+            Vocabulary,
+            db.and_(
+                VocabularyRecord.word == Vocabulary.word,
+                VocabularyRecord.user_id == Vocabulary.user_id
+            )
+        ).filter(
+            VocabularyRecord.user_id == user_id
+        ).order_by(
+            VocabularyRecord.created_at.desc()
+        ).limit(limit).all()
+        
+        result = [{
+            'word': record.VocabularyRecord.word,
+            'category': record.VocabularyRecord.category,
+            'is_correct': record.VocabularyRecord.is_correct,
+            'meaning': record.meaning,
+            'created_at': record.VocabularyRecord.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        } for record in records]
+        
+        logging.info(f"成功获取学习历史，共 {len(result)} 条记录")
+        return jsonify(result)
+    except Exception as e:
+        logging.error(f"获取学习历史时出错: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500 
