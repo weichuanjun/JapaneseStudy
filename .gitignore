@@ -51,3 +51,5 @@ temp_*
 # Azure 凭证
 *.key
 subscription_key.txt
+
+/Users/user/JapaneseStudy/japanese_study.db
