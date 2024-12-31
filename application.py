@@ -78,10 +78,12 @@ def logout():
 @login_required
 def index():
     active_tab = request.args.get('active_tab', 'dashboard')
-    return render_template("index.html", active_tab=active_tab)
+    current_user = User.query.get(session['user_id'])
+    return render_template("index.html", active_tab=active_tab, current_user=current_user)
 
 # 保存阅读练习记录
 def save_reading_record(user_id, content, scores):
+    user = User.query.get(user_id)
     record = ReadingRecord(
         user_id=user_id,
         content=content,
@@ -93,10 +95,12 @@ def save_reading_record(user_id, content, scores):
         words_inserted=scores.get('words_inserted')
     )
     db.session.add(record)
+    user.update_streak()
     db.session.commit()
 
 # 保存话题练习记录
 def save_topic_record(user_id, topic, response, scores):
+    user = User.query.get(user_id)
     # 确保 feedback 是字符串
     if isinstance(scores.get('feedback'), list):
         feedback = '\n'.join(scores.get('feedback', []))
@@ -117,6 +121,7 @@ def save_topic_record(user_id, topic, response, scores):
         grammar_correction=grammar_correction
     )
     db.session.add(record)
+    user.update_streak()
     db.session.commit()
 
 @app.route("/ackaud", methods=["POST"])
