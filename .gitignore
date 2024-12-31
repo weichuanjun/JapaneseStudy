@@ -1,6 +1,10 @@
 # 配置文件
 config.py
 
+# 数据库文件
+*.db
+japanese_study.db
+
 # Python
 __pycache__/
 *.py[cod]
@@ -51,5 +55,3 @@ temp_*
 # Azure 凭证
 *.key
 subscription_key.txt
-
-/Users/user/JapaneseStudy/japanese_study.db
