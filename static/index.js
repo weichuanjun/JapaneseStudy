@@ -449,11 +449,24 @@ function createDownloadLink(blob) {
     recordingsList.appendChild(container);
     document.getElementById("recordingsList").style.display = "block";
 
+    // 添加加载提示
+    var loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading';
+    loadingDiv.id = 'resultLoading';
+    loadingDiv.textContent = '採点中';
+    recordingsList.appendChild(loadingDiv);
+
     // Send audio data to the backend
     var request = new XMLHttpRequest();
     request.open('POST', '/ackaud', true);
 
     request.onload = () => {
+        // 移除加载提示
+        const loadingElement = document.getElementById('resultLoading');
+        if (loadingElement) {
+            loadingElement.remove();
+        }
+
         const data = JSON.parse(request.responseText);
         if (data.RecognitionStatus == "Success") {
             fillData(data.NBest[0]);
