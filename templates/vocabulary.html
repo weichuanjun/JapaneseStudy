@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}単語学習{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vocabulary.css') }}">
+<style>
+    .vocabulary-container {
+        max-width: 800px;
+        margin: 30px auto;
+        padding: 20px;
+    }
+
+    .start-section {
+        text-align: center;
+        margin-bottom: 30px;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .category-preview {
+        margin-bottom: 20px;
+    }
+
+    .category-preview h2 {
+        color: #333;
+        margin-bottom: 15px;
+    }
+
+    .preview-category-btn {
+        padding: 8px 16px;
+        margin: 5px;
+        border: 2px solid #4CAF50;
+        border-radius: 20px;
+        background-color: white;
+        color: #4CAF50;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1em;
+    }
+
+    .preview-category-btn.active {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .start-btn {
+        padding: 15px 40px;
+        font-size: 1.2em;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+    }
+
+    .start-btn:hover {
+        background-color: #45a049;
+        transform: translateY(-2px);
+    }
+
+    .loading-indicator {
+        display: none;
+        text-align: center;
+        margin: 20px 0;
+    }
+
+    .loading-indicator.show {
+        display: block;
+    }
+
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 4px solid #4CAF50;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .status-message {
+        color: #666;
+        margin: 10px 0;
+        font-style: italic;
+    }
+
+    .error-message {
+        color: #f44336;
+        margin: 10px 0;
+        padding: 10px;
+        background-color: #ffebee;
+        border-radius: 4px;
+        display: none;
+    }
+
+    .error-message.show {
+        display: block;
+    }
+
+    .main-content {
+        display: none;
+    }
+
+    .main-content.show {
+        display: block;
+        animation: fadeIn 0.5s ease;
+    }
+
+    .category-selector {
+        margin-bottom: 30px;
+        text-align: center;
+    }
+
+    .category-btn {
+        padding: 10px 20px;
+        margin: 5px;
+        border: none;
+        border-radius: 20px;
+        background-color: #f0f0f0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .category-btn.active {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .word-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 30px;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .word-japanese {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+    }
+
+    .word-reading {
+        font-size: 1.2em;
+        color: #666;
+        margin-bottom: 20px;
+    }
+
+    .options-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        margin: 20px 0;
+    }
+
+    .option-btn {
+        padding: 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.1em;
+    }
+
+    .option-btn:hover {
+        background: #f5f5f5;
+    }
+
+    .option-btn.correct {
+        background: #4CAF50;
+        color: white;
+        border-color: #4CAF50;
+    }
+
+    .option-btn.wrong {
+        background: #f44336;
+        color: white;
+        border-color: #f44336;
+    }
+
+    .example-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+        display: none;
+    }
+
+    .example-section.show {
+        display: block;
+        animation: fadeIn 0.5s ease;
+    }
+
+    .stats-section {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-top: 30px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-top: 15px;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 15px;
+        background: #f5f5f5;
+        border-radius: 8px;
+    }
+
+    .stat-value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #4CAF50;
+    }
+
+    .stat-label {
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .next-btn {
+        display: none;
+        margin: 20px auto;
+        padding: 12px 30px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 1.1em;
+        transition: all 0.3s ease;
+    }
+
+    .next-btn:hover {
+        background: #45a049;
+        transform: translateY(-2px);
+    }
+
+    .next-btn.show {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="vocabulary-container" data-user-id="{{ user_id }}">
+    <div class="start-section">
+        <div class="category-preview">
+            <h2>学習カテゴリー</h2>
+            <div class="preview-buttons">
+                <button class="preview-category-btn active" data-category="n5">N5</button>
+                <button class="preview-category-btn" data-category="n4">N4</button>
+                <button class="preview-category-btn" data-category="n3">N3</button>
+                <button class="preview-category-btn" data-category="n2">N2</button>
+                <button class="preview-category-btn" data-category="n1">N1</button>
+                <button class="preview-category-btn" data-category="daily">日常用语</button>
+                <button class="preview-category-btn" data-category="business">商务用语</button>
+            </div>
+        </div>
+        <button class="start-btn">学習を始める</button>
+        <div class="loading-indicator">
+            <div class="loading-spinner"></div>
+            <div class="status-message">単語を生成中...</div>
+        </div>
+        <div class="error-message"></div>
+    </div>
+
+    <div class="main-content">
+        <div class="category-selector">
+            <button class="category-btn active" data-category="n5">N5</button>
+            <button class="category-btn" data-category="n4">N4</button>
+            <button class="category-btn" data-category="n3">N3</button>
+            <button class="category-btn" data-category="n2">N2</button>
+            <button class="category-btn" data-category="n1">N1</button>
+            <button class="category-btn" data-category="daily">日常用语</button>
+            <button class="category-btn" data-category="business">商务用语</button>
+        </div>
+
+        <div class="word-card">
+            <div class="word-japanese"></div>
+            <div class="word-reading"></div>
+            <div class="options-container"></div>
+            <button class="next-btn">次の単語 →</button>
+            <div class="example-section">
+                <h3>例文</h3>
+                <div class="example-japanese"></div>
+                <div class="example-reading"></div>
+                <div class="example-meaning"></div>
+            </div>
+        </div>
+
+        <div class="stats-section">
+            <h3>学習統計</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalWords">0</div>
+                    <div class="stat-label">総単語数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="correctWords">0</div>
+                    <div class="stat-label">正解数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="accuracy">0%</div>
+                    <div class="stat-label">正確率</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='vocabulary.js') }}"></script>
+{% endblock %} 

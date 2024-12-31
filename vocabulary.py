@@ -1,0 +1,362 @@
+from flask import Blueprint, jsonify, request
+from models import db, VocabularyRecord
+import json
+import logging
+import time
+import google.generativeai as genai
+from config import GEMINI_API_KEY, GEMINI_MODEL
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler('vocabulary.log'),
+        logging.StreamHandler()
+    ]
+)
+
+# 配置 Gemini API
+try:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel(GEMINI_MODEL)
+except Exception as e:
+    logging.error(f"Gemini API 配置失败: {str(e)}")
+    raise
+
+vocabulary_bp = Blueprint('vocabulary', __name__)
+
+CATEGORIES = {
+    'n1': 'JLPT N1 词汇',
+    'n2': 'JLPT N2 词汇',
+    'n3': 'JLPT N3 词汇',
+    'n4': 'JLPT N4 词汇',
+    'n5': 'JLPT N5 词汇',
+    'daily': '日常用语',
+    'business': '商务用语'
+}
+
+def generate_word_prompt(category, performance=None):
+    logging.info(f"开始生成单词提示 - 类别: {CATEGORIES[category]}")
+    base_prompt = f"""You are a Japanese language teacher. Generate a vocabulary quiz for {CATEGORIES.get(category, 'basic')} level.
+Return ONLY a JSON object with the following format (no additional text or explanation).
+
+Here's an example of the expected format:
+{{
+    "word": "食べる",
+    "reading": "たべる",
+    "meaning": "吃",
+    "options": ["吃", "喝", "走", "跑"],
+    "example": "私は毎日ここで昼ごはんを食べます。",
+    "example_reading": "わたしはまいにちここでひるごはんをたべます。",
+    "example_meaning": "我每天在这里吃午饭。"
+}}
+
+Requirements:
+1. The word should be in Japanese Kanji (if applicable) or Hiragana if no Kanji exists
+2. The reading must be in Hiragana only (no Kanji or Katakana)
+3. The meaning and all options must be in Chinese (Simplified Chinese)
+4. The example sentence must use the word in a natural context
+5. The first option in "options" array must be the correct meaning (it will be shuffled later)
+6. All wrong options must be plausible but clearly different from the correct meaning
+7. The example sentence must be simple and natural Japanese
+8. Do not include any explanations or additional text, just the JSON object
+9. Ensure all Japanese text uses proper Japanese characters (not Unicode escapes)
+10. The options array must contain exactly 4 items
+
+For N5 level words, use basic vocabulary like:
+- 食べる (eat)
+- 飲む (drink)
+- 行く (go)
+- 来る (come)
+- 見る (see)
+etc.
+
+For N1 level words, use more advanced vocabulary.
+For daily words, use common conversational vocabulary.
+For business words, use office and workplace vocabulary."""
+
+    if performance:
+        correct_rate = performance.get('correct_rate', 0)
+        if correct_rate > 0.8:
+            base_prompt += "\nPlease increase the difficulty slightly as the user has a high success rate."
+            logging.info(f"用户表现优秀（正确率: {correct_rate:.2%}），提高难度")
+        elif correct_rate < 0.4:
+            base_prompt += "\nPlease decrease the difficulty as the user needs more practice with basics."
+            logging.info(f"用户需要帮助（正确率: {correct_rate:.2%}），降低难度")
+        else:
+            logging.info(f"保持当前难度（正确率: {correct_rate:.2%}）")
+    else:
+        logging.info("首次学习该类别，使用默认难度")
+    
+    return base_prompt
+
+def validate_word_data(word_data):
+    """验证单词数据的格式和内容"""
+    logging.info("开始验证单词数据")
+    
+    required_fields = ['word', 'reading', 'meaning', 'options', 'example', 'example_reading', 'example_meaning']
+    
+    # 检查所有必需字段
+    for field in required_fields:
+        if field not in word_data:
+            logging.error(f"缺少必要字段: {field}")
+            return False, f"Missing required field: {field}"
+            
+    # 验证选项数量
+    if not isinstance(word_data['options'], list) or len(word_data['options']) != 4:
+        logging.error(f"选项数量不正确: {len(word_data['options'])}")
+        return False, "Options must contain exactly 4 items"
+        
+    # 验证第一个选项是否与meaning相同
+    if word_data['options'][0] != word_data['meaning']:
+        logging.error("第一个选项不是正确答案")
+        return False, "First option must be the correct meaning"
+        
+    # 验证日语文本格式 - 允许汉字（漢字）、平假名、片假名
+    def is_japanese_char(c):
+        code = ord(c)
+        return (
+            (0x3040 <= code <= 0x309F) or  # 平假名
+            (0x30A0 <= code <= 0x30FF) or  # 片假名
+            (0x4E00 <= code <= 0x9FFF) or  # 漢字
+            c in ['々', 'ー', '〜']  # 特殊符号
+        )
+    
+    if not all(is_japanese_char(c) for c in word_data['word'] if not c.isspace()):
+        logging.error("单词包含非日语字符")
+        return False, "Word contains invalid characters"
+        
+    # 验证读音是否为平假名
+    if not all(0x3040 <= ord(c) <= 0x309F or c.isspace() for c in word_data['reading']):
+        logging.error("读音不是平假名")
+        return False, "Reading must be in Hiragana"
+        
+    # 验证中文选项
+    def is_chinese_char(c):
+        code = ord(c)
+        return (0x4E00 <= code <= 0x9FFF) or c.isspace()
+    
+    if not all(is_chinese_char(c) for c in word_data['meaning']):
+        logging.error("含义不是中文")
+        return False, "Meaning must be in Chinese"
+        
+    for option in word_data['options']:
+        if not all(is_chinese_char(c) for c in option):
+            logging.error("选项不是中文")
+            return False, "Options must be in Chinese"
+            
+    logging.info("单词数据验证通过")
+    return True, None
+
+def generate_word_with_gemini(prompt):
+    """使用Gemini API生成单词数据"""
+    try:
+        logging.info("开始调用Gemini API生成单词")
+        
+        # 配置生成参数
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+        
+        # 生成内容
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            error_msg = "Gemini API返回空响应"
+            logging.error(error_msg)
+            return None, error_msg
+            
+        logging.info("成功收到Gemini响应")
+        # 尝试解析JSON
+        try:
+            # 查找第一个 [ 和最后一个 ] 之间的内容
+            text = response.text
+            json_start = text.find('[')
+            json_end = text.rfind(']') + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_str = text[json_start:json_end]
+                words_data = json.loads(json_str)
+                
+                # 确保返回的是列表
+                if not isinstance(words_data, list):
+                    error_msg = "响应格式不正确，期望得到单词列表"
+                    logging.error(error_msg)
+                    return None, error_msg
+                    
+                # 随机选择一个单词
+                import random
+                word_data = random.choice(words_data)
+                logging.info(f"从 {len(words_data)} 个单词中随机选择了一个")
+                return word_data, None
+            else:
+                error_msg = "响应中未找到有效的JSON数据"
+                logging.error(error_msg)
+                return None, error_msg
+        except json.JSONDecodeError as e:
+            error_msg = f"JSON解析错误: {str(e)}"
+            logging.error(f"{error_msg}\n原始响应: {text}")
+            return None, error_msg
+            
+    except Exception as e:
+        error_msg = f"调用Gemini API时出错: {str(e)}"
+        logging.error(error_msg, exc_info=True)
+        return None, error_msg
+
+@vocabulary_bp.route('/api/vocabulary/word', methods=['POST'])
+def get_word():
+    start_time = time.time()
+    logging.info("=== 开始新的单词生成请求 ===")
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data received'}), 400
+            
+        category = data.get('category', 'n5')
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
+        
+        logging.info(f"处理单词请求 - 用户ID: {user_id}, 类别: {CATEGORIES[category]}")
+        
+        # 获取用户在该类别的表现数据
+        performance = None
+        records = VocabularyRecord.query.filter_by(
+            user_id=user_id,
+            category=category
+        ).order_by(VocabularyRecord.created_at.desc()).limit(10).all()
+        
+        if records:
+            correct_count = sum(1 for r in records if r.is_correct)
+            performance = {
+                'correct_rate': correct_count / len(records)
+            }
+            logging.info(f"获取到用户历史表现 - 最近{len(records)}次练习，正确率: {performance['correct_rate']:.2%}")
+        else:
+            logging.info("未找到该类别的历史记录")
+        
+        prompt = generate_word_prompt(category, performance)
+        logging.info("生成的提示: " + prompt)
+        
+        # 最多尝试3次生成单词
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            # 使用Gemini API生成单词
+            word_data, error = generate_word_with_gemini(prompt)
+            
+            if error:
+                if attempt == max_attempts - 1:
+                    return jsonify({'error': error}), 500
+                logging.warning(f"第 {attempt + 1} 次尝试失败，准备重试")
+                continue
+                
+            # 验证数据格式和内容
+            is_valid, error_message = validate_word_data(word_data)
+            if is_valid:
+                logging.info(f"成功解析单词数据: {json.dumps(word_data, ensure_ascii=False, indent=2)}")
+                end_time = time.time()
+                logging.info(f"=== 单词生成完成 耗时: {end_time - start_time:.2f}秒 ===")
+                return jsonify(word_data)
+            
+            if attempt == max_attempts - 1:
+                return jsonify({'error': f'Invalid word data: {error_message}'}), 500
+            logging.warning(f"第 {attempt + 1} 次验证失败，准备重试")
+            
+        return jsonify({'error': 'Failed to generate valid word data after multiple attempts'}), 500
+            
+    except Exception as e:
+        logging.error(f"处理请求时出错: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@vocabulary_bp.route('/api/vocabulary/record', methods=['POST'])
+def record_answer():
+    logging.info("开始记录答案")
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data received'}), 400
+            
+        user_id = data.get('user_id')
+        word = data.get('word')
+        category = data.get('category')
+        is_correct = data.get('is_correct')
+        
+        if not all([user_id, word, category, isinstance(is_correct, bool)]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        logging.info(f"答案数据 - 用户: {user_id}, 单词: {word}, 类别: {category}, 正确: {is_correct}")
+        
+        record = VocabularyRecord(
+            user_id=user_id,
+            word=word,
+            category=category,
+            is_correct=is_correct
+        )
+        
+        db.session.add(record)
+        db.session.commit()
+        
+        logging.info("成功保存答案记录")
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        logging.error(f"保存答案记录时出错: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@vocabulary_bp.route('/api/vocabulary/stats', methods=['GET'])
+def get_stats():
+    logging.info("开始获取统计数据")
+    try:
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
+            
+        logging.info(f"获取用户 {user_id} 的统计数据")
+        
+        # 获取总体统计
+        total_words = VocabularyRecord.query.filter_by(user_id=user_id).count()
+        correct_words = VocabularyRecord.query.filter_by(
+            user_id=user_id,
+            is_correct=True
+        ).count()
+        
+        # 按类别统计
+        category_stats = {}
+        for category in CATEGORIES.keys():
+            total = VocabularyRecord.query.filter_by(
+                user_id=user_id,
+                category=category
+            ).count()
+            correct = VocabularyRecord.query.filter_by(
+                user_id=user_id,
+                category=category,
+                is_correct=True
+            ).count()
+            
+            category_stats[category] = {
+                'total': total,
+                'correct': correct,
+                'accuracy': correct / total if total > 0 else 0
+            }
+        
+        stats = {
+            'total_words': total_words,
+            'correct_words': correct_words,
+            'accuracy': correct_words / total_words if total_words > 0 else 0,
+            'category_stats': category_stats
+        }
+        
+        logging.info(f"统计数据: {stats}")
+        return jsonify(stats)
+    except Exception as e:
+        logging.error(f"获取统计数据时出错: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500 

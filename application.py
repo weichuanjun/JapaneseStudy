@@ -9,6 +9,7 @@ from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE
 from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash
 from models import db, User, ReadingRecord, TopicRecord
 from functools import wraps
+from vocabulary import vocabulary_bp
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'  # 请更改为随机的密钥
@@ -834,3 +835,15 @@ def get_topic_leaderboard():
         'username': username,
         'average_score': round(float(average_score), 2)
     } for username, average_score in leaderboard])
+
+# 注册蓝图
+app.register_blueprint(vocabulary_bp)
+
+@app.route('/vocabulary')
+@login_required
+def vocabulary():
+    current_user = User.query.get(session['user_id'])
+    return render_template('vocabulary.html', 
+                         active_tab='vocabulary', 
+                         current_user=current_user,
+                         user_id=session['user_id'])
