@@ -24,12 +24,9 @@
             margin: 0 auto;
             padding: 0;
             list-style: none;
-            gap: 20px;
-        }
-
-        .nav-right {
-            display: flex;
-            align-items: center;
+            gap: 6px;
+            flex-direction: row;
+            flex-wrap: nowrap;
         }
 
         .nav-item {
@@ -40,13 +37,14 @@
         .nav-link {
             color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
-            padding: 8px 16px;
+            padding: 8px 10px;
             border-radius: 4px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 15px;
+            gap: 6px;
+            font-size: 14px;
             transition: all 0.3s ease;
+            white-space: nowrap;
         }
 
         .nav-link:hover {
@@ -61,34 +59,60 @@
         }
 
         .nav-link i {
-            font-size: 18px;
+            font-size: 16px;
             opacity: 0.85;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            margin-left: 20px;
+            flex-shrink: 0;
         }
 
         .user-profile {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
             cursor: pointer;
-            padding: 8px 16px;
-            border-radius: 20px;
+            padding: 4px 12px;
+            border-radius: 30px;
             transition: all 0.3s ease;
-            margin-left: 20px;
             background-color: rgba(255, 255, 255, 0.08);
         }
 
         .user-profile:hover {
             background-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
         }
 
         .user-name {
             color: rgba(255, 255, 255, 0.85);
-            font-size: 15px;
+            font-size: 14px;
+            white-space: nowrap;
+            min-width: fit-content;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+
+        .user-profile:hover .user-avatar {
+            background-color: rgba(255, 255, 255, 0.25);
         }
 
         .user-profile i {
-            font-size: 20px;
-            color: rgba(255, 255, 255, 0.85);
+            display: none;
         }
 
         .popup {
@@ -267,9 +291,15 @@
                     <i class="fas fa-book"></i> 単語学習
                 </a>
             </li>
+            <li class="nav-item">
+                <a href="{{ url_for('forum.forum_page') }}" class="nav-link {% if active_tab == 'forum' %}active{% endif %}">
+                    <i class="fas fa-comments"></i> 掲示板
+                </a>
+            </li>
         </ul>
         <div class="nav-right">
             <div class="user-profile" id="userProfile">
+                <div class="user-avatar">{{ current_user.username[0] }}</div>
                 <span class="user-name">{{ current_user.username }}</span>
                 <i class="fas fa-user-circle"></i>
             </div>
@@ -320,23 +350,27 @@
 
     {% block scripts %}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    {% endblock %}
+
+    <!-- 用户详情的JavaScript代码 -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const userProfile = document.getElementById('userProfile');
             const userPopup = document.getElementById('userPopup');
             
-            userProfile.addEventListener('click', function(e) {
-                e.stopPropagation();
-                userPopup.classList.toggle('show');
-            });
-            
-            document.addEventListener('click', function(e) {
-                if (!userPopup.contains(e.target) && !userProfile.contains(e.target)) {
-                    userPopup.classList.remove('show');
-                }
-            });
+            if (userProfile && userPopup) {
+                userProfile.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    userPopup.classList.toggle('show');
+                });
+                
+                document.addEventListener('click', function(e) {
+                    if (!userPopup.contains(e.target) && !userProfile.contains(e.target)) {
+                        userPopup.classList.remove('show');
+                    }
+                });
+            }
         });
     </script>
-    {% endblock %}
 </body>
 </html> 

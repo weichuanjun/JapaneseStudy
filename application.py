@@ -10,11 +10,18 @@ from flask import Flask, jsonify, render_template, request, make_response, redir
 from models import db, User, ReadingRecord, TopicRecord
 from functools import wraps
 from vocabulary import vocabulary_bp
+from forum import forum_bp
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'  # 请更改为随机的密钥
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///japanese_study.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'connect_args': {
+        'timeout': 30,
+        'check_same_thread': False
+    }
+}
 
 # 初始化数据库
 db.init_app(app)
@@ -75,13 +82,12 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
-@app.route("/")
+@app.route('/')
 @login_required
 def index():
     active_tab = request.args.get('active_tab', 'dashboard')
     current_user = User.query.get(session['user_id'])
-    return render_template("index.html", active_tab=active_tab, current_user=current_user)
-
+    return render_template('index.html', active_tab=active_tab, current_user=current_user)
 # 保存阅读练习记录
 def save_reading_record(user_id, content, scores):
     user = User.query.get(user_id)
@@ -838,6 +844,7 @@ def get_topic_leaderboard():
 
 # 注册蓝图
 app.register_blueprint(vocabulary_bp)
+app.register_blueprint(forum_bp)
 
 @app.route('/vocabulary')
 @login_required
