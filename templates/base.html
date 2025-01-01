@@ -16,6 +16,11 @@
             height: 60px;
             background-color: #45a049;
             box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
         }
         
         .nav-list {
@@ -66,49 +71,66 @@
         .nav-right {
             display: flex;
             align-items: center;
-            margin-left: 20px;
-            flex-shrink: 0;
+            margin-left: auto;
+            padding-right: 60px;
+            height: 60px;
+            position: relative;
+            z-index: 1001;
         }
 
         .user-profile {
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
             cursor: pointer;
-            padding: 4px 12px;
-            border-radius: 30px;
+            padding: 0;
+            border-radius: 50%;
             transition: all 0.3s ease;
-            background-color: rgba(255, 255, 255, 0.08);
+            background-color: rgba(255, 255, 255, 0.12);
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            max-width: 44px !important;
+            max-height: 44px !important;
+            overflow: visible !important;
+            position: relative;
+            box-sizing: border-box;
         }
 
         .user-profile:hover {
-            background-color: rgba(255, 255, 255, 0.15);
+            background-color: rgba(255, 255, 255, 0.25);
             transform: translateY(-1px);
         }
 
         .user-name {
-            color: rgba(255, 255, 255, 0.85);
-            font-size: 14px;
-            white-space: nowrap;
-            min-width: fit-content;
+            display: none;
         }
 
         .user-avatar {
-            width: 28px;
-            height: 28px;
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            max-width: 44px !important;
+            max-height: 44px !important;
             border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.15);
-            display: flex;
+            background-color: rgba(255, 255, 255, 0.2);
+            display: flex !important;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 14px;
+            font-size: 20px;
             font-weight: 500;
-            flex-shrink: 0;
+            text-transform: uppercase;
+            overflow: visible !important;
+            box-sizing: border-box;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
         .user-profile:hover .user-avatar {
-            background-color: rgba(255, 255, 255, 0.25);
+            background-color: rgba(255, 255, 255, 0.3);
         }
 
         .user-profile i {
@@ -117,8 +139,8 @@
 
         .popup {
             display: none;
-            position: absolute;
-            top: 60px;
+            position: fixed;
+            top: 70px;
             right: 20px;
             background: white;
             border-radius: 8px;
@@ -260,6 +282,10 @@
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid #eee;
+        }
+
+        body {
+            padding-top: 60px;
         }
     </style>
 </head>
