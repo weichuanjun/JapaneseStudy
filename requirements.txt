@@ -1,22 +1,10 @@
-astroid
-azure-cognitiveservices-speech
-certifi
-chardet
-click
-colorama
-Flask
-idna
-isort
-itsdangerous
-Jinja2
-lazy-object-proxy
-MarkupSafe
-mccabe
-pylint
-requests
-six
-toml
-typed-ast
-urllib3
-Werkzeug
-wrapt
+Flask==2.0.1
+Flask-SQLAlchemy==2.5.1
+SQLAlchemy==1.4.23
+Werkzeug==2.0.1
+azure-cognitiveservices-speech==1.31.0
+requests==2.26.0
+python-dotenv==0.19.0
+google-generativeai==0.3.2  # Google Gemini API
+google-ai-generativelanguage==0.4.0  # Gemini 依赖
+google-auth==2.27.0  # Google 认证
