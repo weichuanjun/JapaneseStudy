@@ -17,6 +17,7 @@ class User(db.Model):
     # 关联练习记录
     reading_records = db.relationship('ReadingRecord', backref='user', lazy=True)
     topic_records = db.relationship('TopicRecord', backref='user', lazy=True)
+    vocabulary_records = db.relationship('VocabularyRecord', backref='user', lazy=True)
 
     @property
     def avg_reading_score(self):
@@ -46,13 +47,32 @@ class User(db.Model):
         return round(float(result or 0), 1)
 
     @property
+    def vocabulary_stats(self):
+        """获取词汇学习统计"""
+        from sqlalchemy import func
+        total = db.session.query(func.count(VocabularyRecord.id)).filter(
+            VocabularyRecord.user_id == self.id
+        ).scalar()
+        
+        correct = db.session.query(func.count(VocabularyRecord.id)).filter(
+            VocabularyRecord.user_id == self.id,
+            VocabularyRecord.is_correct == True
+        ).scalar()
+        
+        return {
+            'total': total or 0,
+            'correct': correct or 0,
+            'accuracy': round(correct / total if total > 0 else 0, 2)
+        }
+
+    @property
     def total_practices(self):
-        return len(self.reading_records) + len(self.topic_records)
+        return len(self.reading_records) + len(self.topic_records) + len(self.vocabulary_records)
 
     @property
     def total_study_time(self):
-        # 假设每次练习平均5分钟
-        return self.total_practices * 5
+        # 假设每次练习平均5分钟，词汇练习1分钟
+        return (len(self.reading_records) + len(self.topic_records)) * 5 + len(self.vocabulary_records)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -103,4 +123,59 @@ class TopicRecord(db.Model):
     content_score = db.Column(db.Integer)
     relevance_score = db.Column(db.Integer)
     feedback = db.Column(db.Text)
-    grammar_correction = db.Column(db.Text) 
+    grammar_correction = db.Column(db.Text)
+
+class VocabularyRecord(db.Model):
+    __tablename__ = 'vocabulary_records'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    word = db.Column(db.String(100), nullable=False)  # 日语单词
+    category = db.Column(db.String(20), nullable=False)  # 单词类别（N1-N5, daily, business）
+    is_correct = db.Column(db.Boolean, nullable=False)  # 回答是否正确
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    @classmethod
+    def get_user_performance(cls, user_id, category, limit=10):
+        """获取用户在特定类别的最近表现"""
+        records = cls.query.filter_by(
+            user_id=user_id,
+            category=category
+        ).order_by(cls.created_at.desc()).limit(limit).all()
+        
+        if not records:
+            return None
+            
+        correct_count = sum(1 for r in records if r.is_correct)
+        return {
+            'correct_rate': correct_count / len(records),
+            'total_answered': len(records)
+        }
+
+class Vocabulary(db.Model):
+    __tablename__ = 'vocabulary'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    word = db.Column(db.String(100), nullable=False)
+    reading = db.Column(db.String(100), nullable=False)
+    meaning = db.Column(db.String(100), nullable=False)
+    example = db.Column(db.String(500))
+    example_reading = db.Column(db.String(500))
+    example_meaning = db.Column(db.String(500))
+    category = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    @property
+    def serialize(self):
+        return {
+            'id': self.id,
+            'word': self.word,
+            'reading': self.reading,
+            'meaning': self.meaning,
+            'example': self.example,
+            'example_reading': self.example_reading,
+            'example_meaning': self.example_meaning,
+            'category': self.category,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        } 
