@@ -422,18 +422,13 @@
                         <div class="score-value" id="contentScore">-</div>
                     </div>
                     <div class="score-item">
-                        <div class="score-label">トピックとの関連性</div>
+                        <div class="score-label">関連性</div>
                         <div class="score-value" id="relevanceScore">-</div>
                     </div>
                 </div>
             </div>
-            <h3>文法の修正</h3>
-            <textarea id="grammarCorrection" rows="12" cols="80" placeholder="文法の修正と提案が表示されます..." readonly></textarea>
-            <div id="feedbackContent" class="feedback-content">
-                <div class="feedback-text">
-                    <h4>アドバイス</h4>
-                    <textarea id="feedbackText" rows="12" cols="80" placeholder="アドバイスが表示されます..." readonly></textarea>
-                </div>
+            <div class="feedback-content">
+                <textarea id="feedbackText" rows="15" cols="80" placeholder="評価とアドバイスが表示されます..." readonly></textarea>
             </div>
         </div>
     </div>
@@ -444,7 +439,7 @@
     <!-- 将来的に追加する練習コンテンツ -->
 </div>
 
-<footer id=footeralert> DTC </footer>
+<footer id=footeralert>  </footer>
 {% endblock %}
 
 {% block scripts %}
