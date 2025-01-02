@@ -194,6 +194,32 @@
         font-weight: bold;
         color: #4CAF50;
     }
+
+    .feedback-section textarea {
+        width: 100%;
+        padding: 15px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 15px;
+        line-height: 1.6;
+        background-color: #fafafa;
+        margin-bottom: 20px;
+        resize: vertical;
+    }
+
+    .feedback-section h3 {
+        margin: 20px 0 15px;
+        color: #333;
+        font-size: 18px;
+        border-bottom: 2px solid #4CAF50;
+        padding-bottom: 8px;
+    }
+
+    .feedback-section h4 {
+        margin: 15px 0 10px;
+        color: #444;
+        font-size: 16px;
+    }
 </style>
 {% endblock %}
 
@@ -372,7 +398,7 @@
 <!-- Topic Tab -->
 <div id="topicTab" class="tab-content {% if active_tab == 'topic' %}active{% endif %}">
     <div class="container">
-        <textarea id="topicText" rows="6" cols="80" placeholder="ここにトピックが表示されます..."></textarea>
+        <textarea id="topicText" rows="8" cols="80" placeholder="ここにトピックが表示されます..."></textarea>
     </div>
     <div class="button-container">
         <button id="generateTopic" class="blue-button">
@@ -381,7 +407,7 @@
             <span class="fa fa-microphone"></span>録音</button>
     </div>
     <div class="container">
-        <textarea id="transcribedText" rows="8" cols="80" placeholder="ここに音声認識の結果が表示されます..." readonly></textarea>
+        <textarea id="transcribedText" rows="10" cols="80" placeholder="ここに音声認識の結果が表示されます..." readonly></textarea>
     </div>
     <div class="container">
         <div class="feedback-section">
@@ -402,11 +428,11 @@
                 </div>
             </div>
             <h3>文法の修正</h3>
-            <textarea id="grammarCorrection" rows="8" cols="80" placeholder="文法の修正と提案が表示されます..." readonly></textarea>
+            <textarea id="grammarCorrection" rows="12" cols="80" placeholder="文法の修正と提案が表示されます..." readonly></textarea>
             <div id="feedbackContent" class="feedback-content">
                 <div class="feedback-text">
                     <h4>アドバイス</h4>
-                    <textarea id="feedbackText" rows="8" cols="80" placeholder="アドバイスが表示されます..." readonly></textarea>
+                    <textarea id="feedbackText" rows="12" cols="80" placeholder="アドバイスが表示されます..." readonly></textarea>
                 </div>
             </div>
         </div>
