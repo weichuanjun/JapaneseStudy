@@ -317,17 +317,76 @@ except Exception as e:
 def generate_japanese_text():
     """使用Google AI生成日语文本"""
     try:
-        logging.info("开始使用Gemini API生成日语文本")
+        difficulty = request.json.get('difficulty', 'medium')  # 默认中等难度
+        logging.info(f"开始使用Gemini API生成{difficulty}难度的文本")
         
         # 配置生成参数
         generation_config = {
-            "temperature": 0.7,
-            "top_p": 0.8,
+            "temperature": 0.9,
+            "top_p": 0.9,
             "top_k": 40,
             "max_output_tokens": 1024,
         }
-        
-        prompt = "まず前回と違うランダムなトピックを生成して、そしてそのトピックに沿った50字程度日本語の文章を書いてください。内容は日語学習者向けで、”トピック：”と余計な説明や注釈を含めないでください。"
+
+        # 根据难度级别选择不同的提示词
+        difficulty_prompts = {
+            'easy': """以下の条件で、日本語の文章を生成してください：
+
+- 基本的な語彙と文法（N5-N4レベル）を使用
+- 日常生活に関連する身近なテーマ
+- 短めの文章（30-40字程度）
+- 単純な文構造
+- 初級学習者でも理解しやすい表現
+
+以下のカテゴリーから1つ選んで文章を作成：
+1. 自己紹介
+2. 趣味
+3. 家族
+4. 日課
+5. 好きな食べ物""",
+            
+            'medium': """以下の条件で、日本語の文章を生成してください：
+
+- 中級程度の語彙と文法（N3-N2レベル）を使用
+- より幅広い話題を扱う
+- 40-50字程度の文章
+- やや複雑な文構造
+- 慣用句や一般的な表現を含める
+
+以下のカテゴリーから1つ選んで文章を作成：
+1. 旅行体験
+2. 文化比較
+3. 最近のニュース
+4. 将来の目標
+5. 社会問題""",
+            
+            'hard': """以下の条件で、日本語の文章を生成してください：
+
+- 高度な語彙と文法（N2-N1レベル）を使用
+- 専門的または抽象的な話題
+- 50-60字程度の文章
+- 複雑な文構造
+- 高度な表現や専門用語を含める
+
+以下のカテゴリーから1つ選んで文章を作成：
+1. 環境問題
+2. 科学技術
+3. 経済動向
+4. 教育制度
+5. 文化論"""
+        }
+
+        base_prompt = """
+{difficulty_specific}
+
+注意事項：
+- 前回と異なる内容を生成すること
+- カテゴリーや説明は含めず、文章のみを出力
+- 自然な日本語表現を使用
+- 文法的に正しい文章を作成
+- 具体的な状況や例を含める"""
+
+        prompt = base_prompt.format(difficulty_specific=difficulty_prompts[difficulty])
         
         # 生成内容
         response = model.generate_content(
@@ -351,22 +410,54 @@ def generate_japanese_text():
 def generate_topic():
     """使用Google AI生成话题"""
     try:
-        logging.info("开始使用Gemini API生成话题")
+        difficulty = request.json.get('difficulty', 'medium')  # 默认中等难度
+        logging.info(f"开始使用Gemini API生成{difficulty}难度的话题")
         
-        # 配置生成参数
+        # 根据难度调整参数
         generation_config = {
-            "temperature": 0.4,
+            "temperature": 0.7,
             "top_p": 0.8,
             "top_k": 40,
             "max_output_tokens": 1024,
         }
+
+        # 根据难度级别选择不同的提示词
+        difficulty_prompts = {
+            'easy': """初級レベルの日本語学習者向けのトピックを生成してください。
+- 基本的な語彙と文法（N5-N4レベル）を使用
+- 日常生活に関連する身近なテーマ
+- 短めの文章で簡潔に説明
+- 具体的で理解しやすい内容""",
+            
+            'medium': """中級レベルの日本語学習者向けのトピックを生成してください。
+- 中級程度の語彙と文法（N3-N2レベル）を使用
+- より幅広い社会的なテーマも含める
+- 適度な長さで詳しく説明
+- 抽象的な概念も部分的に含む""",
+            
+            'hard': """上級レベルの日本語学習者向けのトピックを生成してください。
+- 高度な語彙と文法（N2-N1レベル）を使用
+- 社会問題や専門的なテーマも扱う
+- 複雑な考えを論理的に展開
+- 抽象的な概念や専門用語を含む"""
+        }
         
-        prompt = "日本語の会話練習のためのトピックを1つ提案してください。簡単な説明も付けてくさい。回答は100文字以内でお願いします。"
+        base_prompt = """以下の条件で、会話練習のためのトピックを1つ生成してください：
+
+{difficulty_specific}
+
+回答は以下の形式で：
+- 100文字以内で簡潔に
+- トピックと簡単な説明を含める
+- 学習者が興味を持てる内容
+- 会話が広がりやすいテーマ"""
+
+        prompt = base_prompt.format(difficulty_specific=difficulty_prompts[difficulty])
         
         # 生成内容
         response = model.generate_content(
             prompt,
-            # generation_config=generation_config
+            generation_config=generation_config
         )
         
         if not response or not response.text:

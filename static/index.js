@@ -483,35 +483,50 @@ function createDownloadLink(blob) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('generateText').addEventListener('click', function () {
-        console.log("Generate button clicked");  // 调试信息
+    // 难度选择按钮处理
+    const difficultyBtns = document.querySelectorAll('.difficulty-btn');
+    let selectedDifficulty = 'medium'; // 默认中等难度
 
-        // 添加呼吸效果
+    if (difficultyBtns) {
+        difficultyBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                // 移除所有按钮的激活状态
+                difficultyBtns.forEach(b => b.classList.remove('active'));
+                // 激活当前按钮
+                this.classList.add('active');
+                // 更新选中的难度
+                selectedDifficulty = this.dataset.difficulty;
+            });
+        });
+
+        // 默认激活中等难度按钮
+        document.querySelector('[data-difficulty="medium"]').classList.add('active');
+    }
+
+    document.getElementById('generateText').addEventListener('click', function () {
+        console.log("Generate button clicked");
         this.classList.add('breathing-button');
 
         fetch('/generate_text', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ difficulty: selectedDifficulty })
         })
             .then(response => response.json())
             .then(data => {
-                console.log("Received data:", data);  // 调试信息
+                console.log("Received data:", data);
                 document.getElementById('reftext').value = data.text;
-
-                // 移除呼吸效果
                 this.classList.remove('breathing-button');
             })
             .catch(error => {
                 console.error('Error:', error);
-
-                // 移除呼吸效果
                 this.classList.remove('breathing-button');
             });
     });
-});
 
-// 标签页切换功能
-document.addEventListener('DOMContentLoaded', function () {
-    // 导航栏切换逻辑
+    // 标签页切换功能
     const navLinks = document.querySelectorAll('.nav-links a');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -548,7 +563,11 @@ document.addEventListener('DOMContentLoaded', function () {
             this.classList.add('breathing-button');
 
             fetch('/generate_topic', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ difficulty: selectedDifficulty })
             })
                 .then(response => response.json())
                 .then(data => {
