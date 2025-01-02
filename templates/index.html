@@ -154,6 +154,46 @@
         border-radius: 4px;
         margin: 10px 0;
     }
+
+    .score-section {
+        margin: 20px 0;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .score-items {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .score-item {
+        text-align: center;
+        padding: 15px;
+        flex: 1;
+        background: #f8f9fa;
+        border-radius: 8px;
+        transition: transform 0.2s;
+    }
+
+    .score-item:hover {
+        transform: translateY(-2px);
+    }
+
+    .score-label {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 8px;
+    }
+
+    .score-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4CAF50;
+    }
 </style>
 {% endblock %}
 
@@ -332,7 +372,7 @@
 <!-- Topic Tab -->
 <div id="topicTab" class="tab-content {% if active_tab == 'topic' %}active{% endif %}">
     <div class="container">
-        <textarea id="topicText" rows="3" cols="80" placeholder="ここにトピックが表示されます..."></textarea>
+        <textarea id="topicText" rows="6" cols="80" placeholder="ここにトピックが表示されます..."></textarea>
     </div>
     <div class="button-container">
         <button id="generateTopic" class="blue-button">
@@ -341,34 +381,32 @@
             <span class="fa fa-microphone"></span>録音</button>
     </div>
     <div class="container">
-        <textarea id="transcribedText" rows="5" cols="80" placeholder="ここに音声認識の結果が表示されます..." readonly></textarea>
+        <textarea id="transcribedText" rows="8" cols="80" placeholder="ここに音声認識の結果が表示されます..." readonly></textarea>
     </div>
     <div class="container">
         <div class="feedback-section">
-            <h3>文法の修正</h3>
-            <textarea id="grammarCorrection" rows="5" cols="80" placeholder="文法の修正と提案が表示されます..." readonly></textarea>
-            <h3>フィードバック</h3>
-            <div id="feedbackContent" class="feedback-content">
-                <div class="score-section">
-                    <h4>評価スコア</h4>
-                    <div class="score-items">
-                        <div class="score-item">
-                            <span class="score-label">文法:</span>
-                            <span id="grammarScore" class="score">-</span>
-                        </div>
-                        <div class="score-item">
-                            <span class="score-label">内容:</span>
-                            <span id="contentScore" class="score">-</span>
-                        </div>
-                        <div class="score-item">
-                            <span class="score-label">トピックとの関連性:</span>
-                            <span id="relevanceScore" class="score">-</span>
-                        </div>
+            <div class="score-section chart-section">
+                <div class="score-items">
+                    <div class="score-item">
+                        <div class="score-label">文法</div>
+                        <div class="score-value" id="grammarScore">-</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">内容</div>
+                        <div class="score-value" id="contentScore">-</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">トピックとの関連性</div>
+                        <div class="score-value" id="relevanceScore">-</div>
                     </div>
                 </div>
+            </div>
+            <h3>文法の修正</h3>
+            <textarea id="grammarCorrection" rows="8" cols="80" placeholder="文法の修正と提案が表示されます..." readonly></textarea>
+            <div id="feedbackContent" class="feedback-content">
                 <div class="feedback-text">
                     <h4>アドバイス</h4>
-                    <textarea id="feedbackText" rows="5" cols="80" placeholder="アドバイスが表示されます..." readonly></textarea>
+                    <textarea id="feedbackText" rows="8" cols="80" placeholder="アドバイスが表示されます..." readonly></textarea>
                 </div>
             </div>
         </div>
