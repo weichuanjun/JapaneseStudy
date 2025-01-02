@@ -327,7 +327,7 @@ def generate_japanese_text():
             "max_output_tokens": 1024,
         }
         
-        prompt = "50字程度の簡単な日本語の文章を書いてください。内容は日語学習者向けで、余計な説明や注釈を含めないでください。"
+        prompt = "まず前回と違うランダムなトピックを生成して、そしてそのトピックに沿った50字程度日本語の文章を書いてください。内容は日語学習者向けで、”トピック：”と余計な説明や注釈を含めないでください。"
         
         # 生成内容
         response = model.generate_content(
@@ -355,7 +355,7 @@ def generate_topic():
         
         # 配置生成参数
         generation_config = {
-            "temperature": 0.7,
+            "temperature": 0.4,
             "top_p": 0.8,
             "top_k": 40,
             "max_output_tokens": 1024,
@@ -366,7 +366,7 @@ def generate_topic():
         # 生成内容
         response = model.generate_content(
             prompt,
-            generation_config=generation_config
+            # generation_config=generation_config
         )
         
         if not response or not response.text:
@@ -495,8 +495,7 @@ def transcribe_audio():
             def analyze_text():
                 with app.app_context():  # 确保在应用上下文中执行
                     try:
-                        # 获取语法纠正和评分
-                        grammar_feedback = get_grammar_feedback(transcribed_text)
+                        # 获取评分和反馈
                         topic_feedback = get_topic_feedback(transcribed_text, topic)
                         
                         # 保存记录
@@ -508,8 +507,7 @@ def transcribe_audio():
                                 'grammar_score': topic_feedback.get('grammar_score', 0),
                                 'content_score': topic_feedback.get('content_score', 0),
                                 'relevance_score': topic_feedback.get('relevance_score', 0),
-                                'feedback': topic_feedback.get('feedback', ''),
-                                'grammar_correction': grammar_feedback
+                                'feedback': topic_feedback.get('feedback', '')
                             }
                         )
                         logging.info(f"成功保存用户 {current_user_id} 的练习记录")
@@ -561,52 +559,12 @@ def get_analysis():
         return jsonify({"error": "テキストが見つかりません"}), 400
         
     try:
-        # 获取语法纠正和评分
-        grammar_feedback = get_grammar_feedback(text)
+        # 获取评分和反馈
         topic_feedback = get_topic_feedback(text, topic)
-        
-        return jsonify({
-            "grammar_feedback": grammar_feedback,
-            "topic_feedback": topic_feedback
-        })
+        return jsonify(topic_feedback)
     except Exception as e:
         logging.error(f"获取分析结果时出错: {str(e)}", exc_info=True)
         return jsonify({"error": "分析に失敗しました"}), 500
-
-def get_grammar_feedback(text):
-    """使用Google AI获取语法纠正反馈"""
-    try:
-        logging.info("开始使用Gemini API进行语法分析")
-        
-        prompt = f"""以下の日本語文章を文法的に分析し、修正してください。
-入力: {text}
-
-以下の形式で回答してください：
-1. 修正後の文章
-2. 修正点の説明（箇条書き）
-
-回答は日本語でお願いします。"""
-
-        generation_config = {
-            "temperature": 0.7,
-            "top_p": 0.8,
-            "top_k": 40,
-            "max_output_tokens": 1024,
-        }
-        
-        response = model.generate_content(
-            prompt,
-            generation_config=generation_config
-        )
-        
-        if not response or not response.text:
-            return "文法分析に失敗しました"
-            
-        return response.text.strip()
-        
-    except Exception as e:
-        logging.error(f"Grammar feedback error: {e}")
-        return "文法分析に失敗しました"
 
 def get_topic_feedback(text, topic):
     """使用Google AI获取主题相关的反馈和评分"""
@@ -625,6 +583,7 @@ def get_topic_feedback(text, topic):
    - 敬語の使用は正しいか
    - 時制は一貫しているか
    - 文の構造は正しいか
+   - 修正後の文章と説明
 
 2. 内容の充実度 (content_score)：
    - 説明は具体的か
@@ -644,7 +603,7 @@ def get_topic_feedback(text, topic):
     "grammar_score": 評価点数,
     "content_score": 評価点数,
     "relevance_score": 評価点数,
-    "feedback": "【改善点】\n1. 文法面：\n   - 具体的な指摘\n   - 具体的な指摘\n2. 内容面：\n   - 具体的な指摘\n   - 具体的な指摘\n3. 表現面：\n   - 具体的な指摘\n   - 具体的な指摘"
+    "feedback": "【文法の修正】\n修正された文章と説明\n\n【評価とアドバイス】\n\n1. 文法面：\n   - 具体的な指摘\n\n2. 内容面：\n - 具体的な指摘\n\n3. 関連性：\n   - 具体的な指摘 n\n\4.例文：n\ -テーマに沿った内容で、自由に表現された修正版の文章 "
 }}
 
 注意事項：
