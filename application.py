@@ -5,7 +5,8 @@ import time
 import random
 import azure.cognitiveservices.speech as speechsdk
 import logging
-from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE
+import google.generativeai as genai
+from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE, GEMINI_API_KEY, GEMINI_MODEL
 from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash
 from models import db, User, ReadingRecord, TopicRecord
 from functools import wraps
@@ -337,57 +338,78 @@ def generate_text():
     generated_text = generate_japanese_text()
     return jsonify({"text": generated_text})
 
+# 配置 Gemini API
+try:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel(GEMINI_MODEL)
+except Exception as e:
+    logging.error(f"Gemini API 配置失败: {str(e)}")
+    raise
+
 def generate_japanese_text():
-    # Ollama 本地服务的 API 端点
-    url = "http://localhost:11434/api/generate"  # 默认 Ollama 端口为 11434
-    payload = {
-        "model": "llama3.1:8b",  # 使用的模型名称，例如 llama3 或其他可用的模型
-        "prompt": "50字程度の簡単な日本語の文章を書いてください。内容は日語学習者向けで、余計な説明や注釈を含めないでください。",
-        "stream": False
-    }
-
+    """使用Google AI生成日语文本"""
     try:
-        logging.debug(f"Sending POST request to {url} with payload: {payload}")
+        logging.info("开始使用Gemini API生成日语文本")
         
-        # 发送 POST 请求到 Ollama 服务
-        response = requests.post(url, json=payload)
+        # 配置生成参数
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
         
-        # 记录响应状态码
-        logging.debug(f"Received response with status code: {response.status_code}")
+        prompt = "50字程度の簡単な日本語の文章を書いてください。内容は日語学習者向けで、余計な説明や注釈を含めないでください。"
         
-        response.raise_for_status()  # 检查请求是否成功
-
-        # 解析生成的文本
-        result = response.json()
-        generated_text = result.get("response", "生成失败")  # 根据 Ollama API 返回的数据结构调整
+        # 生成内容
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
         
-        # 记录生成的文本
-        logging.debug(f"Generated text: {generated_text}")
-
-        return generated_text.strip()
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error calling Ollama service: {e}")
+        if not response or not response.text:
+            error_msg = "Gemini API返回空响应"
+            logging.error(error_msg)
+            return "生成失败"
+            
+        logging.info("成功收到Gemini响应")
+        return response.text.strip()
+        
+    except Exception as e:
+        logging.error(f"调用Gemini API时出错: {str(e)}")
         return "生成失败"
 
 @app.route("/generate_topic", methods=["POST"])
 def generate_topic():
-    # 调用 Ollama 服务生成话题
-    url = "http://localhost:11434/api/generate"
-    payload = {
-        "model": "llama3.1:8b",
-        "prompt": "日本語の会話練習のためのトピックを1つ提案してください。簡単な説明も付けてくさい。回答は100文字以内でお願いします。",
-        "stream": False
-    }
-
+    """使用Google AI生成话题"""
     try:
-        logging.debug(f"Sending POST request to {url} with payload: {payload}")
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        result = response.json()
-        topic = result.get("response", "トピック生成に失敗しました")
-        return jsonify({"topic": topic.strip()})
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error calling Ollama service: {e}")
+        logging.info("开始使用Gemini API生成话题")
+        
+        # 配置生成参数
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+        
+        prompt = "日本語の会話練習のためのトピックを1つ提案してください。簡単な説明も付けてくさい。回答は100文字以内でお願いします。"
+        
+        # 生成内容
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            logging.error("Gemini API返回空响应")
+            return jsonify({"topic": "トピック生成に失敗しました"})
+            
+        logging.info("成功收到Gemini响应")
+        return jsonify({"topic": response.text.strip()})
+        
+    except Exception as e:
+        logging.error(f"调用Gemini API时出错: {str(e)}")
         return jsonify({"topic": "トピック生成に失敗しました"})
 
 @app.route("/transcribe_audio", methods=["POST"])
@@ -570,9 +592,11 @@ def get_analysis():
         return jsonify({"error": "分析に失敗しました"}), 500
 
 def get_grammar_feedback(text):
-    """获取语法纠正反馈"""
-    url = "http://localhost:11434/api/generate"
-    prompt = f"""以下の日本語文章を文法的に分析し、修正してください。
+    """使用Google AI获取语法纠正反馈"""
+    try:
+        logging.info("开始使用Gemini API进行语法分析")
+        
+        prompt = f"""以下の日本語文章を文法的に分析し、修正してください。
 入力: {text}
 
 以下の形式で回答してください：
@@ -581,25 +605,33 @@ def get_grammar_feedback(text):
 
 回答は日本語でお願いします。"""
 
-    payload = {
-        "model": "llama3.1:8b",
-        "prompt": prompt,
-        "stream": False
-    }
-
-    try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        result = response.json()
-        return result.get("response", "文法分析に失敗しました")
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+        
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            return "文法分析に失敗しました"
+            
+        return response.text.strip()
+        
     except Exception as e:
         logging.error(f"Grammar feedback error: {e}")
         return "文法分析に失敗しました"
 
 def get_topic_feedback(text, topic):
-    """获取主题相关的反馈和评分"""
-    url = "http://localhost:11434/api/generate"
-    prompt = f"""以下の回答を評価してください。
+    """使用Google AI获取主题相关的反馈和评分"""
+    try:
+        logging.info(f"[Topic Feedback] 开始使用Gemini API评估回答 - Topic: {topic}, Answer: {text}")
+        
+        prompt = f"""以下の回答を評価してください。
 
 トピック: {topic}
 回答: {text}
@@ -621,18 +653,23 @@ def get_topic_feedback(text, topic):
 - 上記のJSONフォーマットを厳密に守る
 - 「」『』【】などの日本語の記号は使わない"""
 
-    payload = {
-        "model": "llama3.1:8b",
-        "prompt": prompt,
-        "stream": False
-    }
-
-    try:
-        logging.info(f"[Topic Feedback] 发送评分请求 - Topic: {topic}, Answer: {text}")
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        result = response.json()
-        feedback_text = result.get("response", "")
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+        
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            logging.error("[Topic Feedback] Gemini API返回空响应")
+            raise ValueError("Empty response from Gemini API")
+            
+        feedback_text = response.text.strip()
         logging.info(f"[Topic Feedback] 收到原始响应：{feedback_text}")
         
         try:
@@ -649,107 +686,34 @@ def get_topic_feedback(text, topic):
             logging.info(f"[Topic Feedback] 提取的JSON字符串：{json_str}")
             
             # 2. 清理JSON字符串
-            # 删除多余的空白和换行
             json_str = re.sub(r'\s+', ' ', json_str).strip()
-            logging.info(f"[Topic Feedback] 清理空白后：{json_str}")
-            
-            # 替换所有日文引号和标点
             json_str = re.sub(r'[「」『』【】、。，．]', '', json_str)
-            logging.info(f"[Topic Feedback] 清理日文标点后：{json_str}")
             
-            # 3. 提取各个字段
-            scores = {}
-            for key in ['grammar_score', 'content_score', 'relevance_score']:
-                match = re.search(rf'"{key}"\s*:\s*(\d+)', json_str)
-                if match:
-                    scores[key] = int(match.group(1))
-                    logging.info(f"[Topic Feedback] 提取{key}: {scores[key]}")
+            # 3. 解析JSON
+            result = json.loads(json_str)
             
-            # 提取feedback
-            feedback_match = re.search(r'"feedback"\s*:\s*"([^"]+)"', json_str)
-            feedback = ""
-            if feedback_match:
-                feedback = feedback_match.group(1)
-                # 移除所有引号和日文标点
-                feedback = re.sub(r'[「」『』【】、。，．]', '', feedback)
-                logging.info(f"[Topic Feedback] 提取feedback: {feedback}")
-            
-            # 4. 构建结果
-            result = {
-                "grammar_score": scores.get('grammar_score', 0),
-                "content_score": scores.get('content_score', 0),
-                "relevance_score": scores.get('relevance_score', 0),
-                "feedback": feedback if feedback else "評価を生成できませんでした"
-            }
-            
-            # 验证分数范围
+            # 4. 验证和规范化结果
             for key in ["grammar_score", "content_score", "relevance_score"]:
-                result[key] = max(0, min(100, result[key]))
+                if key in result:
+                    result[key] = max(0, min(100, int(result[key])))
+                else:
+                    result[key] = 0
+                    
+            if "feedback" not in result or not result["feedback"]:
+                result["feedback"] = "評価を生成できませんでした"
             
             logging.info(f"[Topic Feedback] 最终结果：{result}")
             return result
             
         except (json.JSONDecodeError, ValueError) as e:
             logging.error(f"[Topic Feedback] 解析反馈时出错: {str(e)}")
-            logging.error(f"[Topic Feedback] 原始文本: {feedback_text}")
+            return {
+                "grammar_score": 0,
+                "content_score": 0,
+                "relevance_score": 0,
+                "feedback": "評価の解析に失敗しました"
+            }
             
-            # 尝试备用解析方法
-            try:
-                logging.info("[Topic Feedback] 尝试使用备用解析方法")
-                # 提取分数
-                scores = {}
-                score_patterns = [
-                    (r'grammar_score"?\s*:\s*(\d+)', 'grammar_score'),
-                    (r'content_score"?\s*:\s*(\d+)', 'content_score'),
-                    (r'relevance_score"?\s*:\s*(\d+)', 'relevance_score')
-                ]
-                
-                for pattern, key in score_patterns:
-                    match = re.search(pattern, feedback_text)
-                    if match:
-                        scores[key] = int(match.group(1))
-                        logging.info(f"[Topic Feedback] 备用方法提取{key}: {scores[key]}")
-                
-                # 提取feedback
-                feedback = ""
-                feedback_patterns = [
-                    r'feedback"?\s*:\s*"([^"]+)"',
-                    r'改善点[：:]\s*(.+?)(?=\n|$)',
-                    r'アドバイス[：:]\s*(.+?)(?=\n|$)'
-                ]
-                
-                for pattern in feedback_patterns:
-                    match = re.search(pattern, feedback_text, re.DOTALL)
-                    if match:
-                        feedback = match.group(1).strip()
-                        # 移除所有引号和日文标点
-                        feedback = re.sub(r'[「」『』【】、。，．]', '', feedback)
-                        logging.info(f"[Topic Feedback] 备用方法提取feedback: {feedback}")
-                        break
-                
-                result = {
-                    "grammar_score": scores.get("grammar_score", 0),
-                    "content_score": scores.get("content_score", 0),
-                    "relevance_score": scores.get("relevance_score", 0),
-                    "feedback": feedback if feedback else "評価を生成できませんでした"
-                }
-                
-                # 验证分数范围
-                for key in ["grammar_score", "content_score", "relevance_score"]:
-                    result[key] = max(0, min(100, result[key]))
-                
-                logging.info(f"[Topic Feedback] 备用方法最终结果：{result}")
-                return result
-                
-            except Exception as e2:
-                logging.error(f"[Topic Feedback] 备用解析也失败: {str(e2)}")
-                return {
-                    "grammar_score": 0,
-                    "content_score": 0,
-                    "relevance_score": 0,
-                    "feedback": "評価の解析に失敗しました"
-                }
-                
     except Exception as e:
         logging.error(f"[Topic Feedback] 获取反馈时出错: {str(e)}")
         return {
