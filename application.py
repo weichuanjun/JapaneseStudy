@@ -476,33 +476,51 @@ def transcribe_audio():
         wav_size = os.path.getsize(temp_wav)
         logging.info(f"WAV文件已生成，大小: {wav_size} bytes")
 
-        # 使用whisper进行语音识别
         try:
-            import sys
-            logging.info(f"Python路径: {sys.path}")
-            logging.info("尝试导入whisper...")
+            # 创建 Azure Speech 配置
+            speech_config = speechsdk.SpeechConfig(subscription=SUBSCRIPTION_KEY, region=REGION)
+            speech_config.speech_recognition_language = LANGUAGE
+
+            # 创建音频配置
+            audio_config = speechsdk.audio.AudioConfig(filename=temp_wav)
+
+            # 创建语音识别器
+            speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+            logging.info("已创建Azure语音识别器")
+
+            # 存储所有识别的文本
+            all_results = []
             
-            from whisper import load_model
-            logging.info("开始加载Whisper模型...")
-            model = load_model("base")
-            logging.info("Whisper模型加载成功，开始进行语音识别...")
-            
-            # 设置设备
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            logging.info(f"使用设备: {device}")
-            
-            # 进行转写
-            result = model.transcribe(
-                temp_wav,
-                language="ja",
-                task="transcribe",
-                fp16=False,
-                verbose=True
-            )
-            
-            transcribed_text = result["text"]
-            logging.info(f"语音识别完成，结果: {transcribed_text}")
+            # 定义回调函数
+            done = False
+            def handle_result(evt):
+                if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
+                    all_results.append(evt.result.text)
+                
+            def handle_canceled(evt):
+                if evt.result.reason == speechsdk.ResultReason.Canceled:
+                    cancellation_details = evt.result.cancellation_details
+                    logging.error(f"语音识别被取消: {cancellation_details.reason}")
+                    if cancellation_details.reason == speechsdk.CancellationReason.Error:
+                        logging.error(f"错误详情: {cancellation_details.error_details}")
+                nonlocal done
+                done = True
+
+            # 绑定回调
+            speech_recognizer.recognized.connect(handle_result)
+            speech_recognizer.canceled.connect(handle_canceled)
+            speech_recognizer.session_stopped.connect(lambda evt: setattr(done, True))
+
+            # 开始连续识别
+            logging.info("开始语音识别...")
+            speech_recognizer.start_continuous_recognition()
+            while not done:
+                time.sleep(0.5)
+            speech_recognizer.stop_continuous_recognition()
+
+            # 合并所有识别结果
+            transcribed_text = ' '.join(all_results)
+            logging.info(f"Azure语音识别完成，结果: {transcribed_text}")
 
             # 启动异步任务进行分析
             from threading import Thread
@@ -538,14 +556,10 @@ def transcribe_audio():
                 "text": transcribed_text,
                 "status": "analyzing"
             })
-            
-        except ImportError as e:
-            error_msg = f"Whisper导入错误: {str(e)}"
-            logging.error(error_msg, exc_info=True)
-            return jsonify({"error": f"音声認識の初期化に失敗しました: {error_msg}"}), 500
+                
         except Exception as e:
             error_msg = str(e)
-            logging.error(f"Whisper处理错误: {error_msg}", exc_info=True)
+            logging.error(f"Azure语音识别处理错误: {error_msg}", exc_info=True)
             return jsonify({"error": f"音声認識に失敗しました: {error_msg}"}), 500
         
     except ValueError as e:
