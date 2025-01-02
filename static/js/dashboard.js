@@ -472,4 +472,73 @@ function updateLeaderboard(data, elementId) {
         tr.appendChild(scoreTd);
         tbody.appendChild(tr);
     });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    // 初始化加载排行榜
+    loadLeaderboards('easy');
+
+    // 处理排行榜难度切换
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const type = this.dataset.type;
+            const difficulty = this.dataset.difficulty;
+
+            // 更新按钮状态
+            document.querySelectorAll(`.tab-btn[data-type="${type}"]`).forEach(b => {
+                b.classList.remove('active');
+            });
+            this.classList.add('active');
+
+            // 加载对应难度的排行榜
+            if (type === 'reading') {
+                loadReadingLeaderboard(difficulty);
+            } else if (type === 'topic') {
+                loadTopicLeaderboard(difficulty);
+            }
+        });
+    });
+});
+
+function loadLeaderboards(difficulty) {
+    loadReadingLeaderboard(difficulty);
+    loadTopicLeaderboard(difficulty);
+}
+
+function loadReadingLeaderboard(difficulty) {
+    fetch(`/api/reading/leaderboard/${difficulty}`)
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('readingLeaderboard');
+            tbody.innerHTML = '';
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.username}</td>
+                    <td>${item.average_score}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        })
+        .catch(error => console.error('Error loading reading leaderboard:', error));
+}
+
+function loadTopicLeaderboard(difficulty) {
+    fetch(`/api/topic/leaderboard/${difficulty}`)
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('topicLeaderboard');
+            tbody.innerHTML = '';
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.username}</td>
+                    <td>${item.average_score}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        })
+        .catch(error => console.error('Error loading topic leaderboard:', error));
 } 

@@ -90,7 +90,7 @@ def index():
     current_user = User.query.get(session['user_id'])
     return render_template('index.html', active_tab=active_tab, current_user=current_user)
 # 保存阅读练习记录
-def save_reading_record(user_id, content, scores):
+def save_reading_record(user_id, content, scores, difficulty='medium'):
     user = User.query.get(user_id)
     record = ReadingRecord(
         user_id=user_id,
@@ -100,23 +100,21 @@ def save_reading_record(user_id, content, scores):
         completeness_score=scores.get('completeness_score'),
         pronunciation_score=scores.get('pronunciation_score'),
         words_omitted=scores.get('words_omitted'),
-        words_inserted=scores.get('words_inserted')
+        words_inserted=scores.get('words_inserted'),
+        difficulty=difficulty
     )
     db.session.add(record)
     user.update_streak()
     db.session.commit()
 
 # 保存话题练习记录
-def save_topic_record(user_id, topic, response, scores):
+def save_topic_record(user_id, topic, response, scores, difficulty='medium'):
     user = User.query.get(user_id)
     # 确保 feedback 是字符串
     if isinstance(scores.get('feedback'), list):
         feedback = '\n'.join(scores.get('feedback', []))
     else:
         feedback = str(scores.get('feedback', ''))
-
-    # 确保 grammar_correction 是字符串
-    grammar_correction = str(scores.get('grammar_correction', ''))
 
     record = TopicRecord(
         user_id=user_id,
@@ -126,7 +124,8 @@ def save_topic_record(user_id, topic, response, scores):
         content_score=scores.get('content_score', 0),
         relevance_score=scores.get('relevance_score', 0),
         feedback=feedback,
-        grammar_correction=grammar_correction
+        grammar_correction=scores.get('grammar_correction', ''),
+        difficulty=difficulty
     )
     db.session.add(record)
     user.update_streak()
@@ -137,6 +136,7 @@ def save_topic_record(user_id, topic, response, scores):
 def ackaud():
     f = request.files['audio_data']
     reftext = request.form.get("reftext")
+    difficulty = request.form.get("difficulty", "medium")  # 获取难度参数
     #    f.save(audio)
     #print('file uploaded successfully')
 
@@ -193,7 +193,8 @@ def ackaud():
                     'pronunciation_score': float(scores.get('PronScore', 0)),
                     'words_omitted': ','.join([w['Word'] for w in scores.get('Words', []) if w.get('ErrorType') == 'Omission']),
                     'words_inserted': ','.join([w['Word'] for w in scores.get('Words', []) if w.get('ErrorType') == 'Insertion'])
-                }
+                },
+                difficulty=difficulty
             )
     
     return response.json()
@@ -482,6 +483,7 @@ def transcribe_audio():
 
     audio_file = request.files["audio"]
     topic = request.form.get('topic', '')
+    difficulty = request.form.get('difficulty', 'medium')  # 获取难度参数
     current_user_id = session['user_id']  # 获取当前用户ID
     logging.info(f"接收到音频文件: {audio_file.filename}, Content-Type: {audio_file.content_type}")
     
@@ -599,7 +601,8 @@ def transcribe_audio():
                                 'content_score': topic_feedback.get('content_score', 0),
                                 'relevance_score': topic_feedback.get('relevance_score', 0),
                                 'feedback': topic_feedback.get('feedback', '')
-                            }
+                            },
+                            difficulty=difficulty
                         )
                         logging.info(f"成功保存用户 {current_user_id} 的练习记录")
                     except Exception as e:
@@ -814,9 +817,9 @@ def get_topic_records():
         'grammar_correction': record.grammar_correction
     } for record in records])
 
-@app.route("/api/reading/leaderboard")
+@app.route("/api/reading/leaderboard/<difficulty>")
 @login_required
-def get_reading_leaderboard():
+def get_reading_leaderboard(difficulty='medium'):
     # 获取阅读练习的用户平均分排行榜
     leaderboard = db.session.query(
         User.username,
@@ -827,6 +830,7 @@ def get_reading_leaderboard():
              ReadingRecord.pronunciation_score) / 4
         ).label('average_score')
     ).join(ReadingRecord, User.id == ReadingRecord.user_id)\
+    .filter(ReadingRecord.difficulty == difficulty)\
     .group_by(User.id)\
     .order_by(db.text('average_score DESC'))\
     .limit(10)\
@@ -837,9 +841,9 @@ def get_reading_leaderboard():
         'average_score': round(float(average_score), 2)
     } for username, average_score in leaderboard])
 
-@app.route("/api/topic/leaderboard")
+@app.route("/api/topic/leaderboard/<difficulty>")
 @login_required
-def get_topic_leaderboard():
+def get_topic_leaderboard(difficulty='medium'):
     # 获取Topic练习的用户平均分排行榜
     leaderboard = db.session.query(
         User.username,
@@ -849,6 +853,7 @@ def get_topic_leaderboard():
              TopicRecord.relevance_score) / 3
         ).label('average_score')
     ).join(TopicRecord, User.id == TopicRecord.user_id)\
+    .filter(TopicRecord.difficulty == difficulty)\
     .group_by(User.id)\
     .order_by(db.text('average_score DESC'))\
     .limit(10)\

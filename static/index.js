@@ -430,6 +430,7 @@ function fillData(data) {
 function createDownloadLink(blob) {
     reftextval = reftext.value;
     var url = URL.createObjectURL(blob);
+    const selectedDifficulty = document.querySelector('.difficulty-btn.active').dataset.difficulty;
 
     var container = document.createElement('div');
     container.className = 'audio-container';
@@ -449,19 +450,16 @@ function createDownloadLink(blob) {
     recordingsList.appendChild(container);
     document.getElementById("recordingsList").style.display = "block";
 
-    // 添加加载提示
     var loadingDiv = document.createElement('div');
     loadingDiv.className = 'loading';
     loadingDiv.id = 'resultLoading';
     loadingDiv.textContent = '採点中';
     recordingsList.appendChild(loadingDiv);
 
-    // Send audio data to the backend
     var request = new XMLHttpRequest();
     request.open('POST', '/ackaud', true);
 
     request.onload = () => {
-        // 移除加载提示
         const loadingElement = document.getElementById('resultLoading');
         if (loadingElement) {
             loadingElement.remove();
@@ -478,6 +476,7 @@ function createDownloadLink(blob) {
     const data = new FormData();
     data.append("audio_data", blob, new Date().toISOString());
     data.append("reftext", reftextval);
+    data.append("difficulty", selectedDifficulty);
 
     request.send(data);
 }
@@ -629,9 +628,12 @@ document.addEventListener('DOMContentLoaded', function () {
                             const audioBlob = new Blob(topicChunks, { type: 'audio/webm' });
                             console.log("创建的音频Blob大小:", audioBlob.size, "bytes");
 
+                            const selectedDifficulty = document.querySelector('.difficulty-btn.active').dataset.difficulty;
+
                             const formData = new FormData();
                             formData.append('audio', audioBlob, 'recording.webm');
                             formData.append('topic', document.getElementById('topicText').value);
+                            formData.append('difficulty', selectedDifficulty);
 
                             transcribedText.value = '音声を認識しています...';
 
