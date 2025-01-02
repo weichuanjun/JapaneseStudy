@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}掲示板 - 日本語学習{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='forum.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="forum-container">
+    <div class="forum-header">
+        <h1>掲示板</h1>
+        <button id="newPostBtn" class="btn-primary" onclick="document.getElementById('newPostModal').style.display='block'">
+            <i class="fas fa-plus"></i> 新しい投稿
+        </button>
+    </div>
+    
+    <div class="posts-container">
+        <!-- 帖子列表将通过JavaScript动态加载 -->
+    </div>
+    
+    <div class="pagination">
+        <!-- 分页控件将通过JavaScript动态加载 -->
+    </div>
+</div>
+
+<!-- 新建帖子的模态框 -->
+<div id="newPostModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>新しい投稿を作成</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="newPostForm">
+                <div class="form-group">
+                    <label for="title">タイトル</label>
+                    <input type="text" name="title" id="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="content">内容</label>
+                    <textarea name="content" id="content" required></textarea>
+                    <div class="hint">@momoを入力すると、AIアシスタントが返信します</div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary close-modal">キャンセル</button>
+                    <button type="submit" class="btn-primary">投稿</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 帖子详情的模态框 -->
+<div id="postDetailModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>投稿詳細</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="post-detail">
+                <div class="post-detail-header">
+                    <h3 id="postTitle"></h3>
+                    <div class="post-info">
+                        <span id="postAuthor"></span>
+                        <span id="postTime"></span>
+                    </div>
+                </div>
+                <div class="post-detail-content" id="postContent"></div>
+            </div>
+            
+            <div class="comments-section">
+                <h3>コメント</h3>
+                <div id="commentsContainer" class="comments-container">
+                    <!-- 评论将通过JavaScript动态加载 -->
+                </div>
+                <form id="newCommentForm" class="comment-form">
+                    <div class="form-group">
+                        <textarea name="content" placeholder="コメントを入力してください..." required></textarea>
+                        <div class="hint">@momoを入力すると、AIアシスタントが返信します</div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">コメントを投稿</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='forum.js') }}"></script>
+{% endblock %} 
