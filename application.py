@@ -221,38 +221,6 @@ def gettonguetwister():
     
     return jsonify({"tt":random.choice(tonguetwisters)})
 
-@app.route("/getstory", methods=["POST"])
-def getstory():
-    id = int(request.form.get("id"))
-    stories = [["Read aloud the sentences on the screen.",
-        "We will follow along your speech and help you learn speak English.",
-        "Good luck for your reading lesson!"],
-        ["The Hare and the Tortoise",
-        "Once upon a time, a Hare was making fun of the Tortoise for being so slow.",
-        "\"Do you ever get anywhere?\" he asked with a mocking laugh.",
-        "\"Yes,\" replied the Tortoise, \"and I get there sooner than you think. Let us run a race.\"",
-        "The Hare was amused at the idea of running a race with the Tortoise, but agreed anyway.",
-        "So the Fox, who had consented to act as judge, marked the distance and started the runners off.",
-        "The Hare was soon far out of sight, and in his overconfidence,",
-        "he lay down beside the course to take a nap until the Tortoise should catch up.",
-        "Meanwhile, the Tortoise kept going slowly but steadily, and, after some time, passed the place where the Hare was sleeping.",
-        "The Hare slept on peacefully; and when at last he did wake up, the Tortoise was near the goal.",
-        "The Hare now ran his swiftest, but he could not overtake the Tortoise in time.",
-        "Slow and Steady wins the race."],
-        ["The Ant and The Dove",
-        "A Dove saw an Ant fall into a brook.",
-        "The Ant struggled in vain to reach the bank,",
-        "and in pity, the Dove dropped a blade of straw close beside it.",
-        "Clinging to the straw like a shipwrecked sailor, the Ant floated safely to shore.",
-        "Soon after, the Ant saw a man getting ready to kill the Dove with a stone.",
-        "Just as he cast the stone, the Ant stung the man in the heel, and he missed his aim,",
-        "The startled Dove flew to safety in a distant wood and lived to see another day.",
-        "A kindness is never wasted."]]
-    if(id >= len(stories)):
-        return jsonify({"code":201})
-    else:
-        return jsonify({"code":200,"storyid":id , "storynumelements":len(stories[id]),"story": stories[id]})
-
 @app.route("/gettts", methods=["POST"])
 def gettts():
     reftext = request.form.get("reftext")
