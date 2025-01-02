@@ -32,6 +32,9 @@ except Exception as e:
 # 创建蓝图，添加URL前缀
 forum_bp = Blueprint('forum', __name__, url_prefix='/forum')
 
+# 在文件开头添加常量
+MOMO_USER_ID = 9999999  # momo 的固定用户 ID，使用一个足够大的数值
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -52,18 +55,17 @@ def add_ai_response(post_id, content):
             return False
 
         try:
-            # 使用应用上下文
-            with current_app.app_context():
-                # 创建 AI 回复评论
-                ai_comment = Comment(
-                    content=ai_response,
-                    post_id=post_id,
-                    user_id=1,  # 使用固定的 momo 用户 ID
-                    created_at=datetime.now()
-                )
-                db.session.add(ai_comment)
-                db.session.commit()
-                return True
+            # 直接插入数据库
+            ai_comment = Comment(
+                content=ai_response,
+                post_id=post_id,
+                user_id=MOMO_USER_ID,  # 使用固定的 momo 用户 ID
+                created_at=datetime.now()
+            )
+            db.session.add(ai_comment)
+            db.session.commit()
+            logging.info(f"AI 回复已添加到数据库，post_id: {post_id}")
+            return True
         except Exception as db_error:
             db.session.rollback()
             logging.error(f"数据库操作失败: {str(db_error)}")
@@ -281,63 +283,57 @@ def create_post():
         logging.error(f"创建帖子时出错: {str(e)}")
         return jsonify({'error': '创建帖子失败'}), 500
 
+def add_ai_response_with_app(app, post_id, content):
+    """在应用上下文中添加 AI 回复"""
+    try:
+        with app.app_context():
+            add_ai_response(post_id, content)
+    except Exception as e:
+        logging.error(f"添加 AI 回复时出错: {str(e)}")
+
 @forum_bp.route('/api/posts/<int:post_id>/comments', methods=['POST'])
 @login_required
 def create_comment(post_id):
     """创建新评论"""
-    if not request.is_json:
-        return jsonify({'error': '無効なリクエストデータです'}), 400
-            
-    data = request.get_json()
-    if not data or 'content' not in data:
-        return jsonify({'error': 'コメント内容は必須です'}), 400
-            
-    content = data.get('content')
-    user_id = session['user_id']
-    
-    if not content:
-        return jsonify({'error': 'コメント内容は必須です'}), 400
-
     try:
-        # 检查帖子是否存在
-        post = Post.query.get(post_id)
-        if not post:
-            return jsonify({'error': '投稿が見つかりません'}), 404
-
-        # 创建用户评论
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '无效的请求数据'}), 400
+            
+        content = data.get('content')
+        user_id = session['user_id']
+        
+        if not content:
+            return jsonify({'error': '评论内容不能为空'}), 400
+            
+        # 创建评论
         comment = Comment(
             content=content,
             post_id=post_id,
             user_id=user_id,
             created_at=datetime.now()
         )
-        
         db.session.add(comment)
         db.session.commit()
         
+        # 检查是否包含 @momo，在后台异步处理 AI 回复
+        if '@momo' in content:
+            thread = threading.Thread(
+                target=add_ai_response_with_app,
+                args=(current_app._get_current_object(), post_id, content),
+                daemon=True  # 设置为守护线程，这样主程序退出时线程会自动结束
+            )
+            thread.start()
+            logging.info(f"已启动 AI 回复线程，post_id: {post_id}")
+        
         # 立即返回用户评论
-        response_data = {
+        return jsonify({
             'id': comment.id,
             'content': comment.content,
-            'author_name': User.query.get(user_id).username,
+            'author_name': comment.user.username,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
-        }
-
-        # 如果内容包含@momo，在后台异步处理AI回复
-        if '@momo' in content.lower():
-            app = current_app._get_current_object()  # 获取实际的应用对象
-            thread = threading.Thread(target=add_ai_response_with_app, args=(app, post_id, content))
-            thread.daemon = True
-            thread.start()
-
-        return jsonify(response_data)
-            
+        })
     except Exception as e:
         db.session.rollback()
         logging.error(f"创建评论时出错: {str(e)}")
-        return jsonify({'error': 'コメントの作成に失敗しました'}), 500
-
-def add_ai_response_with_app(app, post_id, content):
-    """在应用上下文中添加 AI 回复"""
-    with app.app_context():
-        add_ai_response(post_id, content) 
+        return jsonify({'error': '创建评论失败'}), 500 
