@@ -16,6 +16,11 @@
             height: 60px;
             background-color: #45a049;
             box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
         }
         
         .nav-list {
@@ -24,12 +29,9 @@
             margin: 0 auto;
             padding: 0;
             list-style: none;
-            gap: 20px;
-        }
-
-        .nav-right {
-            display: flex;
-            align-items: center;
+            gap: 6px;
+            flex-direction: row;
+            flex-wrap: nowrap;
         }
 
         .nav-item {
@@ -40,13 +42,14 @@
         .nav-link {
             color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
-            padding: 8px 16px;
+            padding: 8px 10px;
             border-radius: 4px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 15px;
+            gap: 6px;
+            font-size: 14px;
             transition: all 0.3s ease;
+            white-space: nowrap;
         }
 
         .nav-link:hover {
@@ -61,40 +64,83 @@
         }
 
         .nav-link i {
-            font-size: 18px;
+            font-size: 16px;
             opacity: 0.85;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            margin-left: auto;
+            padding-right: 60px;
+            height: 60px;
+            position: relative;
+            z-index: 1001;
         }
 
         .user-profile {
             display: flex;
             align-items: center;
-            gap: 12px;
+            justify-content: center;
             cursor: pointer;
-            padding: 8px 16px;
-            border-radius: 20px;
+            padding: 0;
+            border-radius: 50%;
             transition: all 0.3s ease;
-            margin-left: 20px;
-            background-color: rgba(255, 255, 255, 0.08);
+            background-color: rgba(255, 255, 255, 0.12);
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            max-width: 44px !important;
+            max-height: 44px !important;
+            overflow: visible !important;
+            position: relative;
+            box-sizing: border-box;
         }
 
         .user-profile:hover {
-            background-color: rgba(255, 255, 255, 0.15);
+            background-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
         }
 
         .user-name {
-            color: rgba(255, 255, 255, 0.85);
-            font-size: 15px;
+            display: none;
+        }
+
+        .user-avatar {
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            max-width: 44px !important;
+            max-height: 44px !important;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.2);
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: 500;
+            text-transform: uppercase;
+            overflow: visible !important;
+            box-sizing: border-box;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .user-profile:hover .user-avatar {
+            background-color: rgba(255, 255, 255, 0.3);
         }
 
         .user-profile i {
-            font-size: 20px;
-            color: rgba(255, 255, 255, 0.85);
+            display: none;
         }
 
         .popup {
             display: none;
-            position: absolute;
-            top: 60px;
+            position: fixed;
+            top: 70px;
             right: 20px;
             background: white;
             border-radius: 8px;
@@ -237,6 +283,10 @@
             text-align: left;
             border-bottom: 1px solid #eee;
         }
+
+        body {
+            padding-top: 60px;
+        }
     </style>
 </head>
 <body>
@@ -267,9 +317,15 @@
                     <i class="fas fa-book"></i> 単語学習
                 </a>
             </li>
+            <li class="nav-item">
+                <a href="{{ url_for('forum.forum_page') }}" class="nav-link {% if active_tab == 'forum' %}active{% endif %}">
+                    <i class="fas fa-comments"></i> 掲示板
+                </a>
+            </li>
         </ul>
         <div class="nav-right">
             <div class="user-profile" id="userProfile">
+                <div class="user-avatar">{{ current_user.username[0] }}</div>
                 <span class="user-name">{{ current_user.username }}</span>
                 <i class="fas fa-user-circle"></i>
             </div>
@@ -320,23 +376,27 @@
 
     {% block scripts %}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    {% endblock %}
+
+    <!-- 用户详情的JavaScript代码 -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const userProfile = document.getElementById('userProfile');
             const userPopup = document.getElementById('userPopup');
             
-            userProfile.addEventListener('click', function(e) {
-                e.stopPropagation();
-                userPopup.classList.toggle('show');
-            });
-            
-            document.addEventListener('click', function(e) {
-                if (!userPopup.contains(e.target) && !userProfile.contains(e.target)) {
-                    userPopup.classList.remove('show');
-                }
-            });
+            if (userProfile && userPopup) {
+                userProfile.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    userPopup.classList.toggle('show');
+                });
+                
+                document.addEventListener('click', function(e) {
+                    if (!userPopup.contains(e.target) && !userProfile.contains(e.target)) {
+                        userPopup.classList.remove('show');
+                    }
+                });
+            }
         });
     </script>
-    {% endblock %}
 </body>
 </html> 
