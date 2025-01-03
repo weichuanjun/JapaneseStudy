@@ -102,7 +102,7 @@ class ReadingRecord(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    practice_date = db.Column(db.DateTime, default=datetime.now)
+    practice_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     content = db.Column(db.Text, nullable=False)  # 练习的文本内容
     accuracy_score = db.Column(db.Float)
     fluency_score = db.Column(db.Float)
@@ -110,20 +110,22 @@ class ReadingRecord(db.Model):
     pronunciation_score = db.Column(db.Float)
     words_omitted = db.Column(db.Text)
     words_inserted = db.Column(db.Text)
+    difficulty = db.Column(db.String(10), nullable=False, default='medium')  # 添加难度字段
 
 class TopicRecord(db.Model):
     __tablename__ = 'topic_records'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    practice_date = db.Column(db.DateTime, default=datetime.now)
+    practice_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     topic = db.Column(db.Text, nullable=False)  # 话题内容
     response = db.Column(db.Text, nullable=False)  # 用户的回答
-    grammar_score = db.Column(db.Integer)
-    content_score = db.Column(db.Integer)
-    relevance_score = db.Column(db.Integer)
+    grammar_score = db.Column(db.Float)
+    content_score = db.Column(db.Float)
+    relevance_score = db.Column(db.Float)
     feedback = db.Column(db.Text)
     grammar_correction = db.Column(db.Text)
+    difficulty = db.Column(db.String(10), nullable=False, default='medium')  # 添加难度字段
 
 class VocabularyRecord(db.Model):
     __tablename__ = 'vocabulary_records'
