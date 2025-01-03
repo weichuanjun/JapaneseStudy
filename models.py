@@ -10,14 +10,44 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    last_practice = db.Column(db.DateTime)
+    avatar_data = db.Column(db.Text)  # Base64 编码的头像数据
+    birthday = db.Column(db.Date)
+    zodiac_sign = db.Column(db.String(20))
+    mbti = db.Column(db.String(4))
+    bio = db.Column(db.Text)
     streak_days = db.Column(db.Integer, default=0)
+    total_practices = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_practice_at = db.Column(db.DateTime)
     
     # 关联练习记录
     reading_records = db.relationship('ReadingRecord', backref='user', lazy=True)
     topic_records = db.relationship('TopicRecord', backref='user', lazy=True)
     vocabulary_records = db.relationship('VocabularyRecord', backref='user', lazy=True)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def update_streak(self):
+        """更新连续学习天数"""
+        from datetime import timedelta
+        now = datetime.now()
+        
+        if not self.last_practice_at:
+            self.streak_days = 1
+        else:
+            days_diff = (now.date() - self.last_practice_at.date()).days
+            if days_diff == 0:  # 同一天的练习
+                pass
+            elif days_diff == 1:  # 连续天数
+                self.streak_days += 1
+            else:  # 中断了
+                self.streak_days = 1
+                
+        self.last_practice_at = now
 
     @property
     def avg_reading_score(self):
@@ -47,55 +77,12 @@ class User(db.Model):
         return round(float(result or 0), 1)
 
     @property
-    def vocabulary_stats(self):
-        """获取词汇学习统计"""
-        from sqlalchemy import func
-        total = db.session.query(func.count(VocabularyRecord.id)).filter(
-            VocabularyRecord.user_id == self.id
-        ).scalar()
-        
-        correct = db.session.query(func.count(VocabularyRecord.id)).filter(
-            VocabularyRecord.user_id == self.id,
-            VocabularyRecord.is_correct == True
-        ).scalar()
-        
-        return {
-            'total': total or 0,
-            'correct': correct or 0,
-            'accuracy': round(correct / total if total > 0 else 0, 2)
-        }
-
-    @property
     def total_practices(self):
+        """计算总练习次数"""
         return len(self.reading_records) + len(self.topic_records) + len(self.vocabulary_records)
 
-    @property
-    def total_study_time(self):
-        # 假设每次练习平均5分钟，词汇练习1分钟
-        return (len(self.reading_records) + len(self.topic_records)) * 5 + len(self.vocabulary_records)
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-    def update_streak(self):
-        from datetime import timedelta
-        now = datetime.now()
-        
-        if not self.last_practice:
-            self.streak_days = 1
-        else:
-            days_diff = (now.date() - self.last_practice.date()).days
-            if days_diff == 0:  # 同一天的练习
-                pass
-            elif days_diff == 1:  # 连续天数
-                self.streak_days += 1
-            else:  # 中断了
-                self.streak_days = 1
-                
-        self.last_practice = now
+    def __repr__(self):
+        return f'<User {self.username}>'
 
 class ReadingRecord(db.Model):
     __tablename__ = 'reading_records'

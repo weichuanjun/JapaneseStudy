@@ -287,10 +287,31 @@
         body {
             padding-top: 60px;
         }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .default-avatar {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--avatar-color, rgba(255, 255, 255, 0.2));
+            color: white;
+            font-size: 20px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
+        {% if current_user %}
         <ul class="nav-list">
             <li class="nav-item">
                 <a href="{{ url_for('index', active_tab='dashboard') }}" class="nav-link {% if active_tab == 'dashboard' %}active{% endif %}">
@@ -319,53 +340,77 @@
             </li>
         </ul>
         <div class="nav-right">
-            <div class="user-profile" id="userProfile">
-                <div class="user-avatar">{{ current_user.username[0] }}</div>
-                <span class="user-name">{{ current_user.username }}</span>
-                <i class="fas fa-user-circle"></i>
+            <div class="user-profile" onclick="togglePopup()">
+                <div class="user-avatar" data-user-id="{{ current_user.id if current_user else '' }}">
+                    {% if current_user and current_user.avatar_data %}
+                        <img src="{{ current_user.avatar_data }}" alt="プロフィール画像">
+                    {% elif current_user %}
+                        <div class="default-avatar">{{ current_user.username[0] }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="popup">
+                <div class="popup-header">
+                    <div class="popup-avatar">
+                        {% if current_user and current_user.avatar_data %}
+                            <img src="{{ current_user.avatar_data }}" alt="プロフィール画像">
+                        {% else %}
+                            {{ current_user.username[0] }}
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h3>{{ current_user.username }}</h3>
+                        <small>会員登録: {{ current_user.created_at.strftime('%Y年%m月%d日') }}</small>
+                    </div>
+                </div>
+                <div class="popup-scores">
+                    <div class="score-item">
+                        <div class="score-label">読む - 平均スコア</div>
+                        <div class="score-value">{{ "%.1f"|format(current_user.avg_reading_score or 0) }}</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">Topic - 平均スコア</div>
+                        <div class="score-value">{{ "%.1f"|format(current_user.avg_topic_score or 0) }}</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">総練習回数</div>
+                        <div class="score-value">{{ current_user.total_practices or 0 }}</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">学習時間</div>
+                        <div class="score-value">{{ current_user.total_study_time or 0 }}分</div>
+                    </div>
+                </div>
+                <div class="popup-info">
+                    <div>最後の練習: {{ current_user.last_practice.strftime('%Y年%m月%d日 %H:%M') if current_user.last_practice else 'なし' }}</div>
+                    <div>連続学習日数: {{ current_user.streak_days or 0 }}日</div>
+                </div>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;">
+                <div class="popup-actions">
+                    <a href="{{ url_for('profile.profile') }}" style="display: flex; align-items: center; gap: 8px; color: #333; text-decoration: none; padding: 8px 0; margin-bottom: 8px;">
+                        <i class="fas fa-user-edit"></i>
+                        プロフィール編集
+                    </a>
+                    <a href="{{ url_for('logout') }}" style="display: flex; align-items: center; gap: 8px; color: #dc3545; text-decoration: none; padding: 8px 0;">
+                        <i class="fas fa-sign-out-alt"></i>
+                        ログアウト
+                    </a>
+                </div>
             </div>
         </div>
+        {% else %}
+        <div class="nav-right">
+            <a href="{{ url_for('login') }}" class="nav-link">
+                <i class="fas fa-sign-in-alt"></i>
+                ログイン
+            </a>
+            <a href="{{ url_for('register') }}" class="nav-link">
+                <i class="fas fa-user-plus"></i>
+                新規登録
+            </a>
+        </div>
+        {% endif %}
     </nav>
-
-    <!-- User Profile Popup -->
-    <div class="popup" id="userPopup">
-        <div class="popup-header">
-            <div class="popup-avatar">
-                {{ current_user.username[0] }}
-            </div>
-            <div>
-                <h3>{{ current_user.username }}</h3>
-                <small>会員登録: {{ current_user.created_at.strftime('%Y年%m月%d日') }}</small>
-            </div>
-        </div>
-        <div class="popup-scores">
-            <div class="score-item">
-                <div class="score-label">読む - 平均スコア</div>
-                <div class="score-value">{{ "%.1f"|format(current_user.avg_reading_score or 0) }}</div>
-            </div>
-            <div class="score-item">
-                <div class="score-label">Topic - 平均スコア</div>
-                <div class="score-value">{{ "%.1f"|format(current_user.avg_topic_score or 0) }}</div>
-            </div>
-            <div class="score-item">
-                <div class="score-label">総練習回数</div>
-                <div class="score-value">{{ current_user.total_practices or 0 }}</div>
-            </div>
-            <div class="score-item">
-                <div class="score-label">学習時間</div>
-                <div class="score-value">{{ current_user.total_study_time or 0 }}分</div>
-            </div>
-        </div>
-        <div class="popup-info">
-            <div>最後の練習: {{ current_user.last_practice.strftime('%Y年%m月%d日 %H:%M') if current_user.last_practice else 'なし' }}</div>
-            <div>連続学習日数: {{ current_user.streak_days or 0 }}日</div>
-        </div>
-        <hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;">
-        <a href="{{ url_for('logout') }}" style="display: flex; align-items: center; gap: 8px; color: #dc3545; text-decoration: none; padding: 8px 0;">
-            <i class="fas fa-sign-out-alt"></i>
-            ログアウト
-        </a>
-    </div>
 
     {% block content %}{% endblock %}
 
@@ -373,25 +418,55 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     {% endblock %}
 
-    <!-- 用户详情的JavaScript代码 -->
+    {% if current_user %}
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const userProfile = document.getElementById('userProfile');
-            const userPopup = document.getElementById('userPopup');
+        function getRandomColor(username) {
+            const colors = [
+                '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e',
+                '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50',
+                '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12',
+                '#d35400', '#c0392b', '#7f8c8d'
+            ];
             
-            if (userProfile && userPopup) {
-                userProfile.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    userPopup.classList.toggle('show');
-                });
-                
-                document.addEventListener('click', function(e) {
-                    if (!userPopup.contains(e.target) && !userProfile.contains(e.target)) {
-                        userPopup.classList.remove('show');
-                    }
-                });
+            const index = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+            return colors[index];
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const defaultAvatars = document.querySelectorAll('.default-avatar');
+            defaultAvatars.forEach(avatar => {
+                const username = avatar.textContent.trim();
+                avatar.style.setProperty('--avatar-color', getRandomColor(username));
+            });
+        });
+
+        function togglePopup() {
+            const popup = document.querySelector('.popup');
+            popup.classList.toggle('show');
+        }
+
+        document.addEventListener('click', function(event) {
+            const popup = document.querySelector('.popup');
+            const userProfile = document.querySelector('.user-profile');
+            
+            if (!popup.contains(event.target) && !userProfile.contains(event.target)) {
+                popup.classList.remove('show');
             }
         });
     </script>
+    {% endif %}
+
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", $('meta[name="csrf-token"]').attr('content'));
+                }
+            }
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
 </body>
 </html> 

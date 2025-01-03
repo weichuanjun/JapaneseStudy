@@ -24,17 +24,35 @@ function initializeForum() {
             .catch(error => console.error('加载帖子失败:', error));
     }
 
+    // 生成随机颜色
+    function getRandomColor(username) {
+        const colors = [
+            '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e',
+            '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50',
+            '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12',
+            '#d35400', '#c0392b', '#7f8c8d'
+        ];
+
+        const index = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+        return colors[index];
+    }
+
     // 创建帖子卡片
     function createPostCard(post) {
         const div = document.createElement('div');
         div.className = 'post-card';
 
-        // 获取用户名首字母作为头像
-        const initial = post.author_name ? post.author_name.charAt(0).toUpperCase() : '?';
+        let avatarHtml;
+        if (post.author_avatar_path) {
+            avatarHtml = `<img src="/static/${post.author_avatar_path}" alt="${post.author_name}">`;
+        } else {
+            const initial = post.author_name ? post.author_name.charAt(0).toUpperCase() : '?';
+            avatarHtml = initial;
+        }
 
         div.innerHTML = `
             <div class="post-header">
-                <div class="post-avatar">${initial}</div>
+                <div class="post-avatar" style="--avatar-color: ${getRandomColor(post.author_name)}">${avatarHtml}</div>
                 <span class="post-author">${post.author_name}</span>
                 <span class="post-time">${formatDate(post.created_at)}</span>
             </div>
@@ -140,10 +158,21 @@ function initializeForum() {
         const div = document.createElement('div');
         div.className = 'comment';
 
+        let avatarHtml;
+        if (comment.author_avatar_path) {
+            avatarHtml = `<img src="/static/${comment.author_avatar_path}" alt="${comment.author_name}">`;
+        } else {
+            const initial = comment.author_name ? comment.author_name.charAt(0).toUpperCase() : '?';
+            avatarHtml = initial;
+        }
+
         div.innerHTML = `
             <div class="comment-header">
-                <span class="comment-author">${comment.author_name}</span>
-                <span class="comment-time">${formatDate(comment.created_at)}</span>
+                <div class="comment-avatar" style="--avatar-color: ${getRandomColor(comment.author_name)}">${avatarHtml}</div>
+                <div class="comment-info">
+                    <span class="comment-author">${comment.author_name}</span>
+                    <span class="comment-time">${formatDate(comment.created_at)}</span>
+                </div>
             </div>
             <p class="comment-content">${comment.content}</p>
         `;
