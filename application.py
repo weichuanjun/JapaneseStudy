@@ -706,7 +706,8 @@ def get_topic_feedback(text, topic):
 - feedbackは必ず番号付きの箇条書きで記入
 - 余計な説明は一切加えない
 - 上記のJSONフォーマットを厳密に守る
-- 「」『』などの日本語の記号は使わない
+-  \nをフォーマットに従って使用
+
 """
 
         generation_config = {
