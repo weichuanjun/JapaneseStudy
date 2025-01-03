@@ -3,18 +3,27 @@ import base64
 import json
 import time
 import random
+import os
 import azure.cognitiveservices.speech as speechsdk
 import logging
 import google.generativeai as genai
+from flask_migrate import Migrate
 from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE, GEMINI_API_KEY, GEMINI_MODEL
-from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash
+from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash, g
 from models import db, User, ReadingRecord, TopicRecord
 from functools import wraps
 from vocabulary import vocabulary_bp
 from forum import forum_bp
+from profile import profile_bp
+from werkzeug.utils import secure_filename
+from PIL import Image
+from datetime import datetime
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'  # 请更改为随机的密钥
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///japanese_study.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -24,8 +33,24 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     }
 }
 
+# CSRF 保护配置
+app.config['WTF_CSRF_ENABLED'] = False  # 暂时禁用 CSRF 保护
+
+# 添加 CSRF 保护
+csrf = CSRFProtect(app)
+
+# 配置上传目录
+app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads/avatars')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
 # 初始化数据库
-db.init_app(app)
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+# 注册蓝图
+app.register_blueprint(vocabulary_bp)
+app.register_blueprint(forum_bp)
+app.register_blueprint(profile_bp)
 
 # 创建数据库表
 with app.app_context():
@@ -39,6 +64,14 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+# 全局上下文处理器
+@app.context_processor
+def inject_user():
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        return {'current_user': user}
+    return {'current_user': None}
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -56,6 +89,10 @@ def login():
     
     return render_template('login.html')
 
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -71,10 +108,73 @@ def register():
         
         user = User(username=username)
         user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
         
-        return redirect(url_for('login'))
+        # 处理可选的个人信息
+        if 'birthday' in request.form and request.form['birthday']:
+            try:
+                user.birthday = datetime.strptime(request.form['birthday'], '%Y-%m-%d').date()
+            except ValueError:
+                return render_template('register.html', error='誕生日の形式が正しくありません')
+        
+        if 'zodiac_sign' in request.form:
+            user.zodiac_sign = request.form['zodiac_sign']
+        
+        if 'mbti' in request.form:
+            user.mbti = request.form['mbti'].upper()
+        
+        if 'bio' in request.form:
+            user.bio = request.form['bio']
+        
+        # 处理头像上传
+        if 'avatar' in request.files:
+            file = request.files['avatar']
+            if file and file.filename:
+                try:
+                    filename = secure_filename(file.filename)
+                    # 使用用户名和时间戳创建唯一文件名
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    new_filename = f"avatar_{timestamp}_{filename}"
+                    
+                    # 确保上传目录存在
+                    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                    
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+                    
+                    # 保存并处理图片
+                    img = Image.open(file)
+                    
+                    # 如果图片是RGBA模式（PNG格式），转换为RGB
+                    if img.mode == 'RGBA':
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        background.paste(img, mask=img.split()[3])
+                        img = background
+                    
+                    # 调整图片大小为200x200，保持纵横比
+                    img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+                    
+                    # 创建一个200x200的白色背景
+                    output = Image.new('RGB', (200, 200), (255, 255, 255))
+                    
+                    # 将调整后的图片粘贴到中心位置
+                    offset = ((200 - img.size[0]) // 2, (200 - img.size[1]) // 2)
+                    output.paste(img, offset)
+                    
+                    # 保存处理后的图片
+                    output.save(filepath, quality=95)
+                    
+                    user.avatar_path = os.path.join('uploads/avatars', new_filename)
+                except Exception as e:
+                    app.logger.error(f"Error saving avatar: {str(e)}")
+                    return render_template('register.html', error='画像のアップロードに失敗しました')
+        
+        try:
+            db.session.add(user)
+            db.session.commit()
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error registering user: {str(e)}")
+            return render_template('register.html', error='ユーザー登録に失敗しました')
     
     return render_template('register.html')
 
@@ -864,10 +964,6 @@ def get_topic_leaderboard(difficulty='medium'):
         'username': username,
         'average_score': round(float(average_score), 2)
     } for username, average_score in leaderboard])
-
-# 注册蓝图
-app.register_blueprint(vocabulary_bp)
-app.register_blueprint(forum_bp)
 
 @app.route('/vocabulary')
 @login_required

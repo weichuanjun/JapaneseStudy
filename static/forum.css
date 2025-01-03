@@ -35,16 +35,24 @@
 }
 
 .post-avatar {
-    width: 18px;
-    height: 18px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    background-color: #4CAF50;
+    background-color: var(--avatar-color, #4CAF50);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
-    margin-right: 6px;
+    font-size: 16px;
+    margin-right: 10px;
+    text-transform: uppercase;
+}
+
+.post-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 .post-author {
@@ -257,13 +265,39 @@
 .comment-header {
     display: flex;
     align-items: center;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
+}
+
+.comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--avatar-color, #4CAF50);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    margin-right: 10px;
+    text-transform: uppercase;
+}
+
+.comment-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.comment-info {
+    display: flex;
+    flex-direction: column;
 }
 
 .comment-author {
+    font-size: 14px;
     font-weight: 500;
     color: #1a1a1b;
-    margin-right: 8px;
 }
 
 .comment-time {
@@ -272,10 +306,10 @@
 }
 
 .comment-content {
+    margin-left: 42px;
     font-size: 14px;
-    color: #4a4a4a;
-    margin: 0;
     line-height: 1.4;
+    color: #4a4a4a;
 }
 
 .btn-primary {
@@ -387,4 +421,33 @@
     color: #1a1a1b;
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+/* 帖子详情页的头像样式 */
+.post-detail-header .post-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+}
+
+/* 用户信息弹窗中的头像样式 */
+.user-info-modal .user-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: var(--avatar-color, #4CAF50);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    margin: 0 auto 20px;
+    text-transform: uppercase;
+}
+
+.user-info-modal .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
 }
