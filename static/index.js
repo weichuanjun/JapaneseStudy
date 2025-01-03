@@ -15,7 +15,7 @@ var scorerow = document.getElementById('scorerow');
 
 var reftext = document.getElementById('reftext');
 var formcontainer = document.getElementById('formcontainer');
-var ttbutton = document.getElementById('randomtt');
+// var ttbutton = document.getElementById('randomtt');
 var hbutton = document.getElementById('buttonhear');
 var recordingsList = document.getElementById('recordingsList');
 var ttsList = document.getElementById('ttsList');
@@ -250,26 +250,26 @@ function getttsforword(word) {
     request.send(dat);
 }
 
-//function for onclick of get tongue twister button
-ttbutton.onclick = function () {
-    var request = new XMLHttpRequest();
-    request.open('POST', '/gettonguetwister', true);
+// //function for onclick of get tongue twister button
+// ttbutton.onclick = function () {
+//     var request = new XMLHttpRequest();
+//     request.open('POST', '/gettonguetwister', true);
 
-    // Callback function for when request completes
-    request.onload = () => {
-        // Extract JSON data from request
-        const data = JSON.parse(request.responseText);
-        reftextval = data.tt;
-        reftext.value = reftextval;
-        reftext.innerText = reftextval;
+//     // Callback function for when request completes
+//     request.onload = () => {
+//         // Extract JSON data from request
+//         const data = JSON.parse(request.responseText);
+//         reftextval = data.tt;
+//         reftext.value = reftextval;
+//         reftext.innerText = reftextval;
 
-    }
+//     }
 
-    //send request
-    request.send();
+//     //send request
+//     request.send();
 
-    return false;
-}
+//     return false;
+// }
 
 //function for handling main button clicks
 document.getElementById('buttonmic').onclick = function () {
