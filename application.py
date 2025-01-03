@@ -5,7 +5,8 @@ import time
 import random
 import azure.cognitiveservices.speech as speechsdk
 import logging
-from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE
+import google.generativeai as genai
+from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE, GEMINI_API_KEY, GEMINI_MODEL
 from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash
 from models import db, User, ReadingRecord, TopicRecord
 from functools import wraps
@@ -89,7 +90,7 @@ def index():
     current_user = User.query.get(session['user_id'])
     return render_template('index.html', active_tab=active_tab, current_user=current_user)
 # 保存阅读练习记录
-def save_reading_record(user_id, content, scores):
+def save_reading_record(user_id, content, scores, difficulty='medium'):
     user = User.query.get(user_id)
     record = ReadingRecord(
         user_id=user_id,
@@ -99,23 +100,21 @@ def save_reading_record(user_id, content, scores):
         completeness_score=scores.get('completeness_score'),
         pronunciation_score=scores.get('pronunciation_score'),
         words_omitted=scores.get('words_omitted'),
-        words_inserted=scores.get('words_inserted')
+        words_inserted=scores.get('words_inserted'),
+        difficulty=difficulty
     )
     db.session.add(record)
     user.update_streak()
     db.session.commit()
 
 # 保存话题练习记录
-def save_topic_record(user_id, topic, response, scores):
+def save_topic_record(user_id, topic, response, scores, difficulty='medium'):
     user = User.query.get(user_id)
     # 确保 feedback 是字符串
     if isinstance(scores.get('feedback'), list):
         feedback = '\n'.join(scores.get('feedback', []))
     else:
         feedback = str(scores.get('feedback', ''))
-
-    # 确保 grammar_correction 是字符串
-    grammar_correction = str(scores.get('grammar_correction', ''))
 
     record = TopicRecord(
         user_id=user_id,
@@ -125,7 +124,8 @@ def save_topic_record(user_id, topic, response, scores):
         content_score=scores.get('content_score', 0),
         relevance_score=scores.get('relevance_score', 0),
         feedback=feedback,
-        grammar_correction=grammar_correction
+        grammar_correction=scores.get('grammar_correction', ''),
+        difficulty=difficulty
     )
     db.session.add(record)
     user.update_streak()
@@ -136,6 +136,7 @@ def save_topic_record(user_id, topic, response, scores):
 def ackaud():
     f = request.files['audio_data']
     reftext = request.form.get("reftext")
+    difficulty = request.form.get("difficulty", "medium")  # 获取难度参数
     #    f.save(audio)
     #print('file uploaded successfully')
 
@@ -192,7 +193,8 @@ def ackaud():
                     'pronunciation_score': float(scores.get('PronScore', 0)),
                     'words_omitted': ','.join([w['Word'] for w in scores.get('Words', []) if w.get('ErrorType') == 'Omission']),
                     'words_inserted': ','.join([w['Word'] for w in scores.get('Words', []) if w.get('ErrorType') == 'Insertion'])
-                }
+                },
+                difficulty=difficulty
             )
     
     return response.json()
@@ -219,38 +221,6 @@ def gettonguetwister():
     ]
     
     return jsonify({"tt":random.choice(tonguetwisters)})
-
-@app.route("/getstory", methods=["POST"])
-def getstory():
-    id = int(request.form.get("id"))
-    stories = [["Read aloud the sentences on the screen.",
-        "We will follow along your speech and help you learn speak English.",
-        "Good luck for your reading lesson!"],
-        ["The Hare and the Tortoise",
-        "Once upon a time, a Hare was making fun of the Tortoise for being so slow.",
-        "\"Do you ever get anywhere?\" he asked with a mocking laugh.",
-        "\"Yes,\" replied the Tortoise, \"and I get there sooner than you think. Let us run a race.\"",
-        "The Hare was amused at the idea of running a race with the Tortoise, but agreed anyway.",
-        "So the Fox, who had consented to act as judge, marked the distance and started the runners off.",
-        "The Hare was soon far out of sight, and in his overconfidence,",
-        "he lay down beside the course to take a nap until the Tortoise should catch up.",
-        "Meanwhile, the Tortoise kept going slowly but steadily, and, after some time, passed the place where the Hare was sleeping.",
-        "The Hare slept on peacefully; and when at last he did wake up, the Tortoise was near the goal.",
-        "The Hare now ran his swiftest, but he could not overtake the Tortoise in time.",
-        "Slow and Steady wins the race."],
-        ["The Ant and The Dove",
-        "A Dove saw an Ant fall into a brook.",
-        "The Ant struggled in vain to reach the bank,",
-        "and in pity, the Dove dropped a blade of straw close beside it.",
-        "Clinging to the straw like a shipwrecked sailor, the Ant floated safely to shore.",
-        "Soon after, the Ant saw a man getting ready to kill the Dove with a stone.",
-        "Just as he cast the stone, the Ant stung the man in the heel, and he missed his aim,",
-        "The startled Dove flew to safety in a distant wood and lived to see another day.",
-        "A kindness is never wasted."]]
-    if(id >= len(stories)):
-        return jsonify({"code":201})
-    else:
-        return jsonify({"code":200,"storyid":id , "storynumelements":len(stories[id]),"story": stories[id]})
 
 @app.route("/gettts", methods=["POST"])
 def gettts():
@@ -337,57 +307,169 @@ def generate_text():
     generated_text = generate_japanese_text()
     return jsonify({"text": generated_text})
 
+# 配置 Gemini API
+try:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel(GEMINI_MODEL)
+except Exception as e:
+    logging.error(f"Gemini API 配置失败: {str(e)}")
+    raise
+
 def generate_japanese_text():
-    # Ollama 本地服务的 API 端点
-    url = "http://localhost:11434/api/generate"  # 默认 Ollama 端口为 11434
-    payload = {
-        "model": "llama3.1:8b",  # 使用的模型名称，例如 llama3 或其他可用的模型
-        "prompt": "50字程度の簡単な日本語の文章を書いてください。内容は日語学習者向けで、余計な説明や注釈を含めないでください。",
-        "stream": False
-    }
-
+    """使用Google AI生成日语文本"""
     try:
-        logging.debug(f"Sending POST request to {url} with payload: {payload}")
+        difficulty = request.json.get('difficulty', 'medium')  # 默认中等难度
+        logging.info(f"开始使用Gemini API生成{difficulty}难度的文本")
         
-        # 发送 POST 请求到 Ollama 服务
-        response = requests.post(url, json=payload)
-        
-        # 记录响应状态码
-        logging.debug(f"Received response with status code: {response.status_code}")
-        
-        response.raise_for_status()  # 检查请求是否成功
+        # 配置生成参数
+        generation_config = {
+            "temperature": 0.9,
+            "top_p": 0.9,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
 
-        # 解析生成的文本
-        result = response.json()
-        generated_text = result.get("response", "生成失败")  # 根据 Ollama API 返回的数据结构调整
-        
-        # 记录生成的文本
-        logging.debug(f"Generated text: {generated_text}")
+        # 根据难度级别选择不同的提示词
+        difficulty_prompts = {
+            'easy': """以下の条件で、日本語の文章を生成してください：
 
-        return generated_text.strip()
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error calling Ollama service: {e}")
+- 基本的な語彙と文法（N5-N4レベル）を使用
+- 日常生活に関連する身近なテーマ
+- 短めの文章（30-40字程度）
+- 単純な文構造
+- 初級学習者でも理解しやすい表現
+
+以下のカテゴリーから1つ選んで文章を作成：
+1. 自己紹介
+2. 趣味
+3. 家族
+4. 日課
+5. 好きな食べ物""",
+            
+            'medium': """以下の条件で、日本語の文章を生成してください：
+
+- 中級程度の語彙と文法（N3-N2レベル）を使用
+- より幅広い話題を扱う
+- 40-50字程度の文章
+- やや複雑な文構造
+- 慣用句や一般的な表現を含める
+
+以下のカテゴリーから1つ選んで文章を作成：
+1. 旅行体験
+2. 文化比較
+3. 最近のニュース
+4. 将来の目標
+5. 社会問題""",
+            
+            'hard': """以下の条件で、日本語の文章を生成してください：
+
+- 高度な語彙と文法（N2-N1レベル）を使用
+- 専門的または抽象的な話題
+- 50-60字程度の文章
+- 複雑な文構造
+- 高度な表現や専門用語を含める
+
+以下のカテゴリーから1つ選んで文章を作成：
+1. 環境問題
+2. 科学技術
+3. 経済動向
+4. 教育制度
+5. 文化論"""
+        }
+
+        base_prompt = """
+{difficulty_specific}
+
+注意事項：
+- 前回と異なる内容を生成すること
+- カテゴリーや説明は含めず、文章のみを出力
+- 自然な日本語表現を使用
+- 文法的に正しい文章を作成
+- 具体的な状況や例を含める"""
+
+        prompt = base_prompt.format(difficulty_specific=difficulty_prompts[difficulty])
+        
+        # 生成内容
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            error_msg = "Gemini API返回空响应"
+            logging.error(error_msg)
+            return "生成失败"
+            
+        logging.info("成功收到Gemini响应")
+        return response.text.strip()
+        
+    except Exception as e:
+        logging.error(f"调用Gemini API时出错: {str(e)}")
         return "生成失败"
 
 @app.route("/generate_topic", methods=["POST"])
 def generate_topic():
-    # 调用 Ollama 服务生成话题
-    url = "http://localhost:11434/api/generate"
-    payload = {
-        "model": "llama3.1:8b",
-        "prompt": "日本語の会話練習のためのトピックを1つ提案してください。簡単な説明も付けてくさい。回答は100文字以内でお願いします。",
-        "stream": False
-    }
-
+    """使用Google AI生成话题"""
     try:
-        logging.debug(f"Sending POST request to {url} with payload: {payload}")
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        result = response.json()
-        topic = result.get("response", "トピック生成に失敗しました")
-        return jsonify({"topic": topic.strip()})
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error calling Ollama service: {e}")
+        difficulty = request.json.get('difficulty', 'medium')  # 默认中等难度
+        logging.info(f"开始使用Gemini API生成{difficulty}难度的话题")
+        
+        # 根据难度调整参数
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+
+        # 根据难度级别选择不同的提示词
+        difficulty_prompts = {
+            'easy': """初級レベルの日本語学習者向けのトピックを生成してください。
+- 基本的な語彙と文法（N5-N4レベル）を使用
+- 日常生活に関連する身近なテーマ
+- 短めの文章で簡潔に説明
+- 具体的で理解しやすい内容""",
+            
+            'medium': """中級レベルの日本語学習者向けのトピックを生成してください。
+- 中級程度の語彙と文法（N3-N2レベル）を使用
+- より幅広い社会的なテーマも含める
+- 適度な長さで詳しく説明
+- 抽象的な概念も部分的に含む""",
+            
+            'hard': """上級レベルの日本語学習者向けのトピックを生成してください。
+- 高度な語彙と文法（N2-N1レベル）を使用
+- 社会問題や専門的なテーマも扱う
+- 複雑な考えを論理的に展開
+- 抽象的な概念や専門用語を含む"""
+        }
+        
+        base_prompt = """以下の条件で、会話練習のためのトピックを1つ生成してください：
+
+{difficulty_specific}
+
+回答は以下の形式で：
+- 100文字以内で簡潔に
+- トピックと簡単な説明を含める
+- 学習者が興味を持てる内容
+- 会話が広がりやすいテーマ"""
+
+        prompt = base_prompt.format(difficulty_specific=difficulty_prompts[difficulty])
+        
+        # 生成内容
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            logging.error("Gemini API返回空响应")
+            return jsonify({"topic": "トピック生成に失敗しました"})
+            
+        logging.info("成功收到Gemini响应")
+        return jsonify({"topic": response.text.strip()})
+        
+    except Exception as e:
+        logging.error(f"调用Gemini API时出错: {str(e)}")
         return jsonify({"topic": "トピック生成に失敗しました"})
 
 @app.route("/transcribe_audio", methods=["POST"])
@@ -401,6 +483,7 @@ def transcribe_audio():
 
     audio_file = request.files["audio"]
     topic = request.form.get('topic', '')
+    difficulty = request.form.get('difficulty', 'medium')  # 获取难度参数
     current_user_id = session['user_id']  # 获取当前用户ID
     logging.info(f"接收到音频文件: {audio_file.filename}, Content-Type: {audio_file.content_type}")
     
@@ -454,41 +537,58 @@ def transcribe_audio():
         wav_size = os.path.getsize(temp_wav)
         logging.info(f"WAV文件已生成，大小: {wav_size} bytes")
 
-        # 使用whisper进行语音识别
         try:
-            import sys
-            logging.info(f"Python路径: {sys.path}")
-            logging.info("尝试导入whisper...")
+            # 创建 Azure Speech 配置
+            speech_config = speechsdk.SpeechConfig(subscription=SUBSCRIPTION_KEY, region=REGION)
+            speech_config.speech_recognition_language = LANGUAGE
+
+            # 创建音频配置
+            audio_config = speechsdk.audio.AudioConfig(filename=temp_wav)
+
+            # 创建语音识别器
+            speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+            logging.info("已创建Azure语音识别器")
+
+            # 存储所有识别的文本
+            all_results = []
             
-            from whisper import load_model
-            logging.info("开始加载Whisper模型...")
-            model = load_model("base")
-            logging.info("Whisper模型加载成功，开始进行语音识别...")
-            
-            # 设置设备
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            logging.info(f"使用设备: {device}")
-            
-            # 进行转写
-            result = model.transcribe(
-                temp_wav,
-                language="ja",
-                task="transcribe",
-                fp16=False,
-                verbose=True
-            )
-            
-            transcribed_text = result["text"]
-            logging.info(f"语音识别完成，结果: {transcribed_text}")
+            # 定义回调函数
+            done = False
+            def handle_result(evt):
+                if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
+                    all_results.append(evt.result.text)
+                
+            def handle_canceled(evt):
+                if evt.result.reason == speechsdk.ResultReason.Canceled:
+                    cancellation_details = evt.result.cancellation_details
+                    logging.error(f"语音识别被取消: {cancellation_details.reason}")
+                    if cancellation_details.reason == speechsdk.CancellationReason.Error:
+                        logging.error(f"错误详情: {cancellation_details.error_details}")
+                nonlocal done
+                done = True
+
+            # 绑定回调
+            speech_recognizer.recognized.connect(handle_result)
+            speech_recognizer.canceled.connect(handle_canceled)
+            speech_recognizer.session_stopped.connect(lambda evt: setattr(done, True))
+
+            # 开始连续识别
+            logging.info("开始语音识别...")
+            speech_recognizer.start_continuous_recognition()
+            while not done:
+                time.sleep(0.5)
+            speech_recognizer.stop_continuous_recognition()
+
+            # 合并所有识别结果
+            transcribed_text = ' '.join(all_results)
+            logging.info(f"Azure语音识别完成，结果: {transcribed_text}")
 
             # 启动异步任务进行分析
             from threading import Thread
             def analyze_text():
                 with app.app_context():  # 确保在应用上下文中执行
                     try:
-                        # 获取语法纠正和评分
-                        grammar_feedback = get_grammar_feedback(transcribed_text)
+                        # 获取评分和反馈
                         topic_feedback = get_topic_feedback(transcribed_text, topic)
                         
                         # 保存记录
@@ -500,9 +600,9 @@ def transcribe_audio():
                                 'grammar_score': topic_feedback.get('grammar_score', 0),
                                 'content_score': topic_feedback.get('content_score', 0),
                                 'relevance_score': topic_feedback.get('relevance_score', 0),
-                                'feedback': topic_feedback.get('feedback', ''),
-                                'grammar_correction': grammar_feedback
-                            }
+                                'feedback': topic_feedback.get('feedback', '')
+                            },
+                            difficulty=difficulty
                         )
                         logging.info(f"成功保存用户 {current_user_id} 的练习记录")
                     except Exception as e:
@@ -516,14 +616,10 @@ def transcribe_audio():
                 "text": transcribed_text,
                 "status": "analyzing"
             })
-            
-        except ImportError as e:
-            error_msg = f"Whisper导入错误: {str(e)}"
-            logging.error(error_msg, exc_info=True)
-            return jsonify({"error": f"音声認識の初期化に失敗しました: {error_msg}"}), 500
+                
         except Exception as e:
             error_msg = str(e)
-            logging.error(f"Whisper处理错误: {error_msg}", exc_info=True)
+            logging.error(f"Azure语音识别处理错误: {error_msg}", exc_info=True)
             return jsonify({"error": f"音声認識に失敗しました: {error_msg}"}), 500
         
     except ValueError as e:
@@ -557,82 +653,80 @@ def get_analysis():
         return jsonify({"error": "テキストが見つかりません"}), 400
         
     try:
-        # 获取语法纠正和评分
-        grammar_feedback = get_grammar_feedback(text)
+        # 获取评分和反馈
         topic_feedback = get_topic_feedback(text, topic)
-        
-        return jsonify({
-            "grammar_feedback": grammar_feedback,
-            "topic_feedback": topic_feedback
-        })
+        return jsonify(topic_feedback)
     except Exception as e:
         logging.error(f"获取分析结果时出错: {str(e)}", exc_info=True)
         return jsonify({"error": "分析に失敗しました"}), 500
 
-def get_grammar_feedback(text):
-    """获取语法纠正反馈"""
-    url = "http://localhost:11434/api/generate"
-    prompt = f"""以下の日本語文章を文法的に分析し、修正してください。
-入力: {text}
-
-以下の形式で回答してください：
-1. 修正後の文章
-2. 修正点の説明（箇条書き）
-
-回答は日本語でお願いします。"""
-
-    payload = {
-        "model": "llama3.1:8b",
-        "prompt": prompt,
-        "stream": False
-    }
-
-    try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        result = response.json()
-        return result.get("response", "文法分析に失敗しました")
-    except Exception as e:
-        logging.error(f"Grammar feedback error: {e}")
-        return "文法分析に失敗しました"
-
 def get_topic_feedback(text, topic):
-    """获取主题相关的反馈和评分"""
-    url = "http://localhost:11434/api/generate"
-    prompt = f"""以下の回答を評価してください。
+    """使用Google AI获取主题相关的反馈和评分"""
+    try:
+        logging.info(f"[Topic Feedback] 开始使用Gemini API评估回答 - Topic: {topic}, Answer: {text}")
+        
+        prompt = f"""以下の回答を評価してください。
 
 トピック: {topic}
 回答: {text}
 
+以下の3つの観点から100点満点で評価し、改善点を具体的に指摘してください：
+
+1. 文法の正確性 (grammar_score)：
+   - 助詞の使用は適切か
+   - 敬語の使用は正しいか
+   - 時制は一貫しているか
+   - 文の構造は正しいか
+   - 修正後の文章と説明
+
+2. 内容の充実度 (content_score)：
+   - 説明は具体的か
+   - 例示は適切か
+   - 論理的な構成になっているか
+   - 内容は十分に展開されているか
+
+3. トピックとの関連性 (relevance_score)：
+   - トピックに適切に応答しているか
+   - 主題から外れていないか
+   - 文脈は一貫しているか
+   - 要点を押さえているか
+
 以下の形式で出力してください。他の説明は一切不要です。
 
 {{
-    "grammar_score": 70,
-    "content_score": 80,
-    "relevance_score": 90,
-    "feedback": "改善点をここに書いてください。"
+    "grammar_score": 評価点数,
+    "content_score": 評価点数,
+    "relevance_score": 評価点数,
+    "feedback": "【文法の修正】\n修正された文章と説明\n\n【評価とアドバイス】\n\n1. 文法面：\n   - 具体的な指摘\n\n2. 内容面：\n - 具体的な指摘\n\n3. 関連性：\n   - 具体的な指摘 n\n\4.例文：n\ -テーマに沿った内容で、自由に表現された修正版の文章 "
 }}
 
 注意事項：
-- 数値は0-100の整数で記入（例：70）
+- 数値は0-100の整数で記入し、実際の評価を反映させること
 - feedbackは必ず"で囲む
-- 改行は入れない
+- feedbackは必ず番号付きの箇条書きで記入
 - 余計な説明は一切加えない
 - 上記のJSONフォーマットを厳密に守る
-- 「」『』【】などの日本語の記号は使わない"""
+-  \nをフォーマットに従って使用
 
-    payload = {
-        "model": "llama3.1:8b",
-        "prompt": prompt,
-        "stream": False
-    }
+"""
 
-    try:
-        logging.info(f"[Topic Feedback] 发送评分请求 - Topic: {topic}, Answer: {text}")
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        result = response.json()
-        feedback_text = result.get("response", "")
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+        
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            logging.error("[Topic Feedback] Gemini API返回空响应")
+            raise ValueError("Empty response from Gemini API")
+            
+        feedback_text = response.text.strip()
         logging.info(f"[Topic Feedback] 收到原始响应：{feedback_text}")
         
         try:
@@ -649,107 +743,34 @@ def get_topic_feedback(text, topic):
             logging.info(f"[Topic Feedback] 提取的JSON字符串：{json_str}")
             
             # 2. 清理JSON字符串
-            # 删除多余的空白和换行
             json_str = re.sub(r'\s+', ' ', json_str).strip()
-            logging.info(f"[Topic Feedback] 清理空白后：{json_str}")
-            
-            # 替换所有日文引号和标点
             json_str = re.sub(r'[「」『』【】、。，．]', '', json_str)
-            logging.info(f"[Topic Feedback] 清理日文标点后：{json_str}")
             
-            # 3. 提取各个字段
-            scores = {}
-            for key in ['grammar_score', 'content_score', 'relevance_score']:
-                match = re.search(rf'"{key}"\s*:\s*(\d+)', json_str)
-                if match:
-                    scores[key] = int(match.group(1))
-                    logging.info(f"[Topic Feedback] 提取{key}: {scores[key]}")
+            # 3. 解析JSON
+            result = json.loads(json_str)
             
-            # 提取feedback
-            feedback_match = re.search(r'"feedback"\s*:\s*"([^"]+)"', json_str)
-            feedback = ""
-            if feedback_match:
-                feedback = feedback_match.group(1)
-                # 移除所有引号和日文标点
-                feedback = re.sub(r'[「」『』【】、。，．]', '', feedback)
-                logging.info(f"[Topic Feedback] 提取feedback: {feedback}")
-            
-            # 4. 构建结果
-            result = {
-                "grammar_score": scores.get('grammar_score', 0),
-                "content_score": scores.get('content_score', 0),
-                "relevance_score": scores.get('relevance_score', 0),
-                "feedback": feedback if feedback else "評価を生成できませんでした"
-            }
-            
-            # 验证分数范围
+            # 4. 验证和规范化结果
             for key in ["grammar_score", "content_score", "relevance_score"]:
-                result[key] = max(0, min(100, result[key]))
+                if key in result:
+                    result[key] = max(0, min(100, int(result[key])))
+                else:
+                    result[key] = 0
+                    
+            if "feedback" not in result or not result["feedback"]:
+                result["feedback"] = "評価を生成できませんでした"
             
             logging.info(f"[Topic Feedback] 最终结果：{result}")
             return result
             
         except (json.JSONDecodeError, ValueError) as e:
             logging.error(f"[Topic Feedback] 解析反馈时出错: {str(e)}")
-            logging.error(f"[Topic Feedback] 原始文本: {feedback_text}")
+            return {
+                "grammar_score": 0,
+                "content_score": 0,
+                "relevance_score": 0,
+                "feedback": "評価の解析に失敗しました"
+            }
             
-            # 尝试备用解析方法
-            try:
-                logging.info("[Topic Feedback] 尝试使用备用解析方法")
-                # 提取分数
-                scores = {}
-                score_patterns = [
-                    (r'grammar_score"?\s*:\s*(\d+)', 'grammar_score'),
-                    (r'content_score"?\s*:\s*(\d+)', 'content_score'),
-                    (r'relevance_score"?\s*:\s*(\d+)', 'relevance_score')
-                ]
-                
-                for pattern, key in score_patterns:
-                    match = re.search(pattern, feedback_text)
-                    if match:
-                        scores[key] = int(match.group(1))
-                        logging.info(f"[Topic Feedback] 备用方法提取{key}: {scores[key]}")
-                
-                # 提取feedback
-                feedback = ""
-                feedback_patterns = [
-                    r'feedback"?\s*:\s*"([^"]+)"',
-                    r'改善点[：:]\s*(.+?)(?=\n|$)',
-                    r'アドバイス[：:]\s*(.+?)(?=\n|$)'
-                ]
-                
-                for pattern in feedback_patterns:
-                    match = re.search(pattern, feedback_text, re.DOTALL)
-                    if match:
-                        feedback = match.group(1).strip()
-                        # 移除所有引号和日文标点
-                        feedback = re.sub(r'[「」『』【】、。，．]', '', feedback)
-                        logging.info(f"[Topic Feedback] 备用方法提取feedback: {feedback}")
-                        break
-                
-                result = {
-                    "grammar_score": scores.get("grammar_score", 0),
-                    "content_score": scores.get("content_score", 0),
-                    "relevance_score": scores.get("relevance_score", 0),
-                    "feedback": feedback if feedback else "評価を生成できませんでした"
-                }
-                
-                # 验证分数范围
-                for key in ["grammar_score", "content_score", "relevance_score"]:
-                    result[key] = max(0, min(100, result[key]))
-                
-                logging.info(f"[Topic Feedback] 备用方法最终结果：{result}")
-                return result
-                
-            except Exception as e2:
-                logging.error(f"[Topic Feedback] 备用解析也失败: {str(e2)}")
-                return {
-                    "grammar_score": 0,
-                    "content_score": 0,
-                    "relevance_score": 0,
-                    "feedback": "評価の解析に失敗しました"
-                }
-                
     except Exception as e:
         logging.error(f"[Topic Feedback] 获取反馈时出错: {str(e)}")
         return {
@@ -797,9 +818,9 @@ def get_topic_records():
         'grammar_correction': record.grammar_correction
     } for record in records])
 
-@app.route("/api/reading/leaderboard")
+@app.route("/api/reading/leaderboard/<difficulty>")
 @login_required
-def get_reading_leaderboard():
+def get_reading_leaderboard(difficulty='medium'):
     # 获取阅读练习的用户平均分排行榜
     leaderboard = db.session.query(
         User.username,
@@ -810,6 +831,7 @@ def get_reading_leaderboard():
              ReadingRecord.pronunciation_score) / 4
         ).label('average_score')
     ).join(ReadingRecord, User.id == ReadingRecord.user_id)\
+    .filter(ReadingRecord.difficulty == difficulty)\
     .group_by(User.id)\
     .order_by(db.text('average_score DESC'))\
     .limit(10)\
@@ -820,9 +842,9 @@ def get_reading_leaderboard():
         'average_score': round(float(average_score), 2)
     } for username, average_score in leaderboard])
 
-@app.route("/api/topic/leaderboard")
+@app.route("/api/topic/leaderboard/<difficulty>")
 @login_required
-def get_topic_leaderboard():
+def get_topic_leaderboard(difficulty='medium'):
     # 获取Topic练习的用户平均分排行榜
     leaderboard = db.session.query(
         User.username,
@@ -832,6 +854,7 @@ def get_topic_leaderboard():
              TopicRecord.relevance_score) / 3
         ).label('average_score')
     ).join(TopicRecord, User.id == TopicRecord.user_id)\
+    .filter(TopicRecord.difficulty == difficulty)\
     .group_by(User.id)\
     .order_by(db.text('average_score DESC'))\
     .limit(10)\

@@ -773,11 +773,6 @@ footer {
     margin-top: 10px;
 }
 
-/* Practice Tab 样式调整 */
-#practiceTab .container:first-child {
-    margin-top: 10px;
-}
-
 /* 详细记录表格样式 */
 .records-table {
     width: 100%;
@@ -1208,15 +1203,6 @@ footer {
 }
 
 #dashboardTab:not(.active) .dashboard-container {
-    display: none !important;
-}
-
-/* Practice页面组件初始状态 */
-#practiceTab:not(.active) {
-    display: none !important;
-}
-
-#practiceTab:not(.active) .container {
     display: none !important;
 }
 

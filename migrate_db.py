@@ -1,54 +1,58 @@
-from flask import Flask
-from models import db
-from migrations import forum_tables
+import sqlite3
 import logging
+from datetime import datetime
 
 # 配置日志
 logging.basicConfig(
+    filename='migration.log',
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler('migration.log'),
-        logging.StreamHandler()
-    ]
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def create_app():
-    """创建Flask应用"""
-    app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///japanese_study.db'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    db.init_app(app)
-    return app
-
-def run_migrations():
-    """运行数据库迁移"""
+def migrate_database():
+    """执行数据库迁移"""
     try:
-        app = create_app()
-        with app.app_context():
-            logging.info("开始数据库迁移...")
+        # 连接到数据库
+        conn = sqlite3.connect('japanese_study.db')
+        cursor = conn.cursor()
+        
+        # 记录迁移开始
+        logging.info("开始数据库迁移")
+        
+        # 检查reading_records表是否存在difficulty列
+        cursor.execute("PRAGMA table_info(reading_records)")
+        columns = cursor.fetchall()
+        has_difficulty = any(column[1] == 'difficulty' for column in columns)
+        
+        if not has_difficulty:
+            logging.info("为reading_records表添加difficulty列")
+            cursor.execute("""
+                ALTER TABLE reading_records 
+                ADD COLUMN difficulty VARCHAR(10) NOT NULL DEFAULT 'medium'
+            """)
             
-            # 运行论坛表迁移
-            logging.info("创建掲示板相关表...")
-            forum_tables.upgrade()
-            logging.info("掲示板表创建成功")
+        # 检查topic_records表是否存在difficulty列
+        cursor.execute("PRAGMA table_info(topic_records)")
+        columns = cursor.fetchall()
+        has_difficulty = any(column[1] == 'difficulty' for column in columns)
+        
+        if not has_difficulty:
+            logging.info("为topic_records表添加difficulty列")
+            cursor.execute("""
+                ALTER TABLE topic_records 
+                ADD COLUMN difficulty VARCHAR(10) NOT NULL DEFAULT 'medium'
+            """)
             
-            # 创建AI助手用户（如果不存在）
-            from models import User
-            momo = User.query.filter_by(username='momo').first()
-            if not momo:
-                logging.info("创建AI助手用户 'momo'...")
-                momo = User(username='momo')
-                momo.set_password('ai_assistant_password')  # 设置一个安全的密码
-                db.session.add(momo)
-                db.session.commit()
-                logging.info("AI助手用户创建成功")
-            
-            logging.info("数据库迁移完成")
-            
+        # 提交更改
+        conn.commit()
+        logging.info("数据库迁移成功完成")
+        
     except Exception as e:
-        logging.error(f"迁移过程中出错: {str(e)}", exc_info=True)
+        logging.error(f"迁移过程中出错: {str(e)}")
+        conn.rollback()
         raise
+    finally:
+        conn.close()
 
-if __name__ == '__main__':
-    run_migrations() 
+if __name__ == "__main__":
+    migrate_database() 
