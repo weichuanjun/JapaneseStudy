@@ -537,22 +537,88 @@ function initializeForum() {
                     }
 
                     // 显示弹窗
-                    const rect = element.getBoundingClientRect();
-                    const viewportWidth = window.innerWidth;
-                    const popupWidth = 300;
-
-                    let left = rect.right + 10;
-                    if (left + popupWidth > viewportWidth) {
-                        left = rect.left - popupWidth - 10;
-                    }
-
-                    userInfoPopup.style.left = `${left}px`;
-                    userInfoPopup.style.top = `${rect.top}px`;
                     userInfoPopup.classList.add('show');
                 }
             })
             .catch(error => {
                 console.error('Error fetching user info:', error);
+            });
+    }
+
+    // 显示用户信息弹窗
+    function showUserInfoPopup(userId, element) {
+        // 清除之前的超时
+        if (popupTimeout) {
+            clearTimeout(popupTimeout);
+        }
+
+        // 如果已有弹窗，先移除
+        if (currentPopup) {
+            currentPopup.remove();
+        }
+
+        // 创建遮罩层
+        let overlay = document.querySelector('.popup-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+            document.body.appendChild(overlay);
+        }
+
+        // 创建新的弹窗
+        const popup = document.createElement('div');
+        popup.className = 'user-info-popup';
+
+        // 加载用户信息
+        fetch(`/api/user/${userId}`)
+            .then(response => response.json())
+            .then(user => {
+                popup.innerHTML = `
+                    <div class="close-popup">&times;</div>
+                    <div class="popup-header">
+                        <div class="popup-avatar">
+                            ${user.avatar_data
+                        ? `<img src="${user.avatar_data}" alt="${user.username}的头像">`
+                        : `<div class="default-avatar">${user.username[0]}</div>`}
+                        </div>
+                        <div class="popup-info">
+                            <h3>${user.username}</h3>
+                            <small>加入时间：${new Date(user.created_at).toLocaleDateString()}</small>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">发帖数</span>
+                        <span class="info-value">${user.post_count || 0}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">评论数</span>
+                        <span class="info-value">${user.comment_count || 0}</span>
+                    </div>
+                    ${user.bio ? `
+                        <div class="bio">
+                            <div class="bio-label">个人简介</div>
+                            <div class="bio-content">${user.bio}</div>
+                        </div>
+                    ` : ''}
+                `;
+
+                document.body.appendChild(popup);
+                currentPopup = popup;
+
+                // 添加关闭按钮事件
+                const closeBtn = popup.querySelector('.close-popup');
+                closeBtn.addEventListener('click', hideUserInfoPopup);
+
+                // 显示遮罩和弹窗
+                overlay.classList.add('show');
+                document.body.classList.add('popup-open');
+                popup.classList.add('show');
+
+                // 添加遮罩层点击关闭事件
+                overlay.addEventListener('click', hideUserInfoPopup);
+            })
+            .catch(error => {
+                console.error('获取用户信息失败:', error);
             });
     }
 
