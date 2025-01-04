@@ -260,22 +260,24 @@ def create_post():
             title=title,
             content=content,
             user_id=user_id,
-            created_at=datetime.now()  # 使用本地时间
+            created_at=datetime.now()
         )
         
         db.session.add(post)
         db.session.commit()
         
-        # 刷新 post 对象以获取完整的关系数据
-        db.session.refresh(post)
+        # 获取用户信息
+        user = User.query.get(user_id)
         
         # 准备响应数据
         response_data = {
             'id': post.id,
             'title': post.title,
             'content': post.content,
-            'author_name': User.query.get(user_id).username,
-            'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # 格式化本地时间
+            'author_id': user_id,
+            'author_name': user.username,
+            'avatar_data': user.avatar_data if user.avatar_data else None,
+            'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'comment_count': 0
         }
         
@@ -322,27 +324,34 @@ def create_comment(post_id):
         db.session.add(comment)
         db.session.commit()
         
+        # 获取用户信息
+        user = User.query.get(user_id)
+        
+        # 准备响应数据
+        response_data = {
+            'id': comment.id,
+            'content': comment.content,
+            'author_id': user_id,
+            'author_name': user.username,
+            'author_avatar_data': user.avatar_data if user.avatar_data else None,
+            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
         # 检查是否包含 @momo，在后台异步处理 AI 回复
         if '@momo' in content:
             thread = threading.Thread(
                 target=add_ai_response_with_app,
                 args=(current_app._get_current_object(), post_id, content),
-                daemon=True  # 设置为守护线程，这样主程序退出时线程会自动结束
+                daemon=True
             )
             thread.start()
             logging.info(f"已启动 AI 回复线程，post_id: {post_id}")
         
-        # 立即返回用户评论
-        return jsonify({
-            'id': comment.id,
-            'content': comment.content,
-            'author_name': comment.user.username,
-            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
-        })
+        return jsonify(response_data)
     except Exception as e:
         db.session.rollback()
         logging.error(f"创建评论时出错: {str(e)}")
-        return jsonify({'error': '创建评论失败'}), 500 
+        return jsonify({'error': '创建评论失败'}), 500
 
 @forum_bp.route('/api/user/<int:user_id>', methods=['GET'])
 @login_required
