@@ -88,6 +88,179 @@
         </div>
     </div>
 </div>
+
+<!-- 用户信息弹窗 -->
+<div class="user-info-popup" id="forumUserInfoPopup">
+    <div class="popup-header">
+        <div class="popup-avatar">
+            <img id="forumPopupUserAvatar" src="" alt="">
+            <div id="forumPopupUserInitial" class="default-avatar"></div>
+        </div>
+        <div class="popup-info">
+            <h3 id="forumPopupUsername"></h3>
+            <small id="forumPopupJoinDate"></small>
+        </div>
+    </div>
+    <div class="popup-body">
+        <div class="info-item">
+            <div class="info-label">読む - 平均スコア</div>
+            <div id="forumPopupReadingScore" class="info-value">0.0</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Topic - 平均スコア</div>
+            <div id="forumPopupTopicScore" class="info-value">0.0</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">総練習回数</div>
+            <div id="forumPopupTotalPractices" class="info-value">0</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">総学習時間</div>
+            <div id="forumPopupTotalStudyTime" class="info-value">0分</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">連続学習日数</div>
+            <div id="forumPopupStreakDays" class="info-value">0日</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">最後の練習</div>
+            <div id="forumPopupLastPractice" class="info-value">-</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">誕生日</div>
+            <div id="forumPopupBirthday" class="info-value">-</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">星座</div>
+            <div id="forumPopupZodiac" class="info-value">-</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">MBTI</div>
+            <div id="forumPopupMBTI" class="info-value">-</div>
+        </div>
+        <div class="bio">
+            <div class="bio-label">自己紹介</div>
+            <div id="forumPopupBio" class="bio-content">-</div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .post-author {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+    }
+
+    .author-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        background-color: var(--avatar-color, rgba(0, 0, 0, 0.1));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .author-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .author-avatar .default-avatar {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 18px;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userInfoPopup = document.getElementById('forumUserInfoPopup');
+    const authors = document.querySelectorAll('.post-author');
+    
+    // 设置默认头像颜色
+    document.querySelectorAll('.default-avatar').forEach(avatar => {
+        const username = avatar.textContent.trim();
+        avatar.style.setProperty('--avatar-color', getRandomColor(username));
+    });
+
+    // 处理鼠标悬停事件
+    authors.forEach(author => {
+        author.addEventListener('mouseenter', async function(e) {
+            const userId = this.dataset.userId;
+            try {
+                const response = await fetch(`/api/user/${userId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const user = data.user;
+                    
+                    // 更新弹窗内容
+                    document.getElementById('forumPopupUsername').textContent = user.username;
+                    document.getElementById('forumPopupJoinDate').textContent = `会員登録: ${user.created_at}`;
+                    document.getElementById('forumPopupReadingScore').textContent = 
+                        (user.avg_reading_score || 0).toFixed(1);
+                    document.getElementById('forumPopupTopicScore').textContent = 
+                        (user.avg_topic_score || 0).toFixed(1);
+                    document.getElementById('forumPopupTotalPractices').textContent = 
+                        user.total_practices || 0;
+                    document.getElementById('forumPopupTotalStudyTime').textContent = 
+                        `${user.total_study_time || 0}分`;
+                    document.getElementById('forumPopupStreakDays').textContent = 
+                        `${user.streak_days || 0}日`;
+                    document.getElementById('forumPopupLastPractice').textContent = 
+                        user.last_practice || '-';
+                    document.getElementById('forumPopupBirthday').textContent = 
+                        user.birthday || '-';
+                    document.getElementById('forumPopupZodiac').textContent = 
+                        user.zodiac_sign || '-';
+                    document.getElementById('forumPopupMBTI').textContent = 
+                        user.mbti || '-';
+                    document.getElementById('forumPopupBio').textContent = 
+                        user.bio || '-';
+                    
+                    // 处理头像显示
+                    const avatarImg = document.getElementById('forumPopupUserAvatar');
+                    const avatarInitial = document.getElementById('forumPopupUserInitial');
+                    
+                    if (user.avatar_data) {
+                        avatarImg.src = user.avatar_data;
+                        avatarImg.style.display = 'block';
+                        avatarInitial.style.display = 'none';
+                    } else {
+                        avatarImg.style.display = 'none';
+                        avatarInitial.style.display = 'flex';
+                        avatarInitial.textContent = user.username[0];
+                        avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
+                    }
+                    
+                    // 显示弹窗
+                    const rect = this.getBoundingClientRect();
+                    userInfoPopup.style.top = `${rect.top}px`;
+                    userInfoPopup.style.left = `${rect.right + 10}px`;
+                    userInfoPopup.classList.add('show');
+                }
+            } catch (error) {
+                console.error('Error fetching user info:', error);
+            }
+        });
+
+        author.addEventListener('mouseleave', function() {
+            userInfoPopup.classList.remove('show');
+        });
+    });
+});
+</script>
 {% endblock %}
 
 {% block scripts %}

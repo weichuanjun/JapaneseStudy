@@ -921,49 +921,65 @@ def get_topic_records():
 @app.route("/api/reading/leaderboard/<difficulty>")
 @login_required
 def get_reading_leaderboard(difficulty='medium'):
-    # 获取阅读练习的用户平均分排行榜
-    leaderboard = db.session.query(
-        User.username,
-        db.func.avg(
-            (ReadingRecord.accuracy_score + 
-             ReadingRecord.fluency_score + 
-             ReadingRecord.completeness_score + 
-             ReadingRecord.pronunciation_score) / 4
-        ).label('average_score')
-    ).join(ReadingRecord, User.id == ReadingRecord.user_id)\
-    .filter(ReadingRecord.difficulty == difficulty)\
-    .group_by(User.id)\
-    .order_by(db.text('average_score DESC'))\
-    .limit(10)\
-    .all()
-    
-    return jsonify([{
-        'username': username,
-        'average_score': round(float(average_score), 2)
-    } for username, average_score in leaderboard])
+    try:
+        # 获取阅读练习的用户平均分排行榜
+        leaderboard = db.session.query(
+            User.id,
+            User.username,
+            User.avatar_data,
+            db.func.avg(
+                (ReadingRecord.accuracy_score + 
+                 ReadingRecord.fluency_score + 
+                 ReadingRecord.completeness_score + 
+                 ReadingRecord.pronunciation_score) / 4
+            ).label('average_score')
+        ).join(ReadingRecord, User.id == ReadingRecord.user_id)\
+        .filter(ReadingRecord.difficulty == difficulty)\
+        .group_by(User.id, User.username, User.avatar_data)\
+        .order_by(db.text('average_score DESC'))\
+        .limit(10)\
+        .all()
+        
+        return jsonify([{
+            'user_id': str(id),
+            'username': username,
+            'avatar_data': avatar_data,
+            'average_score': round(float(average_score), 2) if average_score else 0
+        } for id, username, avatar_data, average_score in leaderboard])
+    except Exception as e:
+        app.logger.error(f"Error getting reading leaderboard: {str(e)}")
+        return jsonify([])
 
 @app.route("/api/topic/leaderboard/<difficulty>")
 @login_required
 def get_topic_leaderboard(difficulty='medium'):
-    # 获取Topic练习的用户平均分排行榜
-    leaderboard = db.session.query(
-        User.username,
-        db.func.avg(
-            (TopicRecord.grammar_score + 
-             TopicRecord.content_score + 
-             TopicRecord.relevance_score) / 3
-        ).label('average_score')
-    ).join(TopicRecord, User.id == TopicRecord.user_id)\
-    .filter(TopicRecord.difficulty == difficulty)\
-    .group_by(User.id)\
-    .order_by(db.text('average_score DESC'))\
-    .limit(10)\
-    .all()
-    
-    return jsonify([{
-        'username': username,
-        'average_score': round(float(average_score), 2)
-    } for username, average_score in leaderboard])
+    try:
+        # 获取Topic练习的用户平均分排行榜
+        leaderboard = db.session.query(
+            User.id,
+            User.username,
+            User.avatar_data,
+            db.func.avg(
+                (TopicRecord.grammar_score + 
+                 TopicRecord.content_score + 
+                 TopicRecord.relevance_score) / 3
+            ).label('average_score')
+        ).join(TopicRecord, User.id == TopicRecord.user_id)\
+        .filter(TopicRecord.difficulty == difficulty)\
+        .group_by(User.id, User.username, User.avatar_data)\
+        .order_by(db.text('average_score DESC'))\
+        .limit(10)\
+        .all()
+        
+        return jsonify([{
+            'user_id': str(id),
+            'username': username,
+            'avatar_data': avatar_data,
+            'average_score': round(float(average_score), 2) if average_score else 0
+        } for id, username, avatar_data, average_score in leaderboard])
+    except Exception as e:
+        app.logger.error(f"Error getting topic leaderboard: {str(e)}")
+        return jsonify([])
 
 @app.route('/vocabulary')
 @login_required
@@ -972,3 +988,27 @@ def vocabulary():
     return render_template('vocabulary.html', 
                          active_tab='vocabulary', 
                          current_user=current_user)
+
+@app.route('/api/user/<int:user_id>')
+@login_required
+def get_user_info(user_id):
+    user = User.query.get_or_404(user_id)
+    return jsonify({
+        'success': True,
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'avatar_data': user.avatar_data,
+            'birthday': user.birthday.strftime('%Y-%m-%d') if user.birthday else None,
+            'zodiac_sign': user.zodiac_sign,
+            'mbti': user.mbti,
+            'bio': user.bio,
+            'avg_reading_score': user.avg_reading_score,
+            'avg_topic_score': user.avg_topic_score,
+            'total_practices': user.total_practices,
+            'total_study_time': user.total_study_time,
+            'streak_days': user.streak_days,
+            'last_practice': user.last_practice.strftime('%Y-%m-%d %H:%M') if user.last_practice else None,
+            'created_at': user.created_at.strftime('%Y年%m月%d日')
+        }
+    })
