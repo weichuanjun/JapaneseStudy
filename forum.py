@@ -170,13 +170,15 @@ def get_posts():
             .order_by(Post.created_at.desc())\
             .paginate(page=page, per_page=per_page, error_out=False)
         
-        # 构建响应数据，包含用户名
+        # 构建响应数据，包含用户名和头像
         posts_data = [{
             'id': post.Post.id,
             'title': post.Post.title,
             'content': post.Post.content,
+            'author_id': post.User.id,
             'author_name': post.User.username,
-            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # 格式化本地时间
+            'avatar_data': post.User.avatar_data if post.User.avatar_data else None,
+            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'comment_count': Comment.query.filter_by(post_id=post.Post.id).count()
         } for post in posts.items]
         
@@ -205,8 +207,10 @@ def get_post(post_id):
             'id': post.Post.id,
             'title': post.Post.title,
             'content': post.Post.content,
+            'author_id': post.User.id,
             'author_name': post.User.username,
-            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S')  # 格式化本地时间
+            'author_avatar_data': post.User.avatar_data if post.User.avatar_data else None,
+            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S')
         })
     except Exception as e:
         logging.error(f"获取帖子详情时出错: {str(e)}")
@@ -227,7 +231,9 @@ def get_comments(post_id):
         return jsonify([{
             'id': comment.Comment.id,
             'content': comment.Comment.content,
+            'author_id': comment.User.id,
             'author_name': comment.User.username,
+            'author_avatar_data': comment.User.avatar_data if comment.User.avatar_data else None,
             'created_at': comment.Comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
         } for comment in comments])
     except Exception as e:
@@ -337,3 +343,40 @@ def create_comment(post_id):
         db.session.rollback()
         logging.error(f"创建评论时出错: {str(e)}")
         return jsonify({'error': '创建评论失败'}), 500 
+
+@forum_bp.route('/api/user/<int:user_id>', methods=['GET'])
+@login_required
+def get_user_info(user_id):
+    """获取用户信息"""
+    try:
+        user = User.query.get_or_404(user_id)
+        
+        # 计算平均分数
+        reading_scores = [score for score in user.reading_scores if score is not None]
+        topic_scores = [score for score in user.topic_scores if score is not None]
+        
+        avg_reading_score = sum(reading_scores) / len(reading_scores) if reading_scores else 0
+        avg_topic_score = sum(topic_scores) / len(topic_scores) if topic_scores else 0
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'avatar_data': user.avatar_data if user.avatar_data else None,
+                'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'avg_reading_score': avg_reading_score,
+                'avg_topic_score': avg_topic_score,
+                'total_practices': user.total_practices,
+                'total_study_time': user.total_study_time,
+                'streak_days': user.streak_days,
+                'last_practice': user.last_practice.strftime('%Y-%m-%d %H:%M:%S') if user.last_practice else None,
+                'birthday': user.birthday,
+                'zodiac_sign': user.zodiac_sign,
+                'mbti': user.mbti,
+                'bio': user.bio
+            }
+        })
+    except Exception as e:
+        logging.error(f"获取用户信息时出错: {str(e)}")
+        return jsonify({'success': False, 'error': '获取用户信息失败'}), 500 
