@@ -110,8 +110,21 @@
     }
     
     .rank {
-        font-weight: bold;
-        color: #4CAF50;
+        font-weight: 700;
+        font-size: 18px;
+        color: #666;
+    }
+
+    .rank-1 {
+        color: #FFB900;
+    }
+
+    .rank-2 {
+        color: #A0A0A0;
+    }
+
+    .rank-3 {
+        color: #CD7F32;
     }
 
     /* 加载状态样式 */
@@ -343,6 +356,172 @@
 
     .tab-btn[data-difficulty="hard"].active {
         background: #f44336;
+    }
+
+    /* 用户信息弹窗样式 */
+    .user-info-popup {
+        position: fixed;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        padding: 16px;
+        width: 360px;
+        z-index: 1000;
+        display: none;
+        border: 1px solid #eee;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        pointer-events: auto;
+        font-size: 13px;
+    }
+
+    .user-info-popup.show {
+        display: block;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .popup-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .popup-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        background-color: var(--avatar-color, #e0e0e0);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .popup-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .popup-info h3 {
+        margin: 0;
+        color: #333;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .popup-info small {
+        color: #666;
+        font-size: 12px;
+    }
+
+    .popup-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .info-group {
+        padding: 8px 0;
+    }
+
+    .info-group:first-child {
+        border-bottom: 1px solid #eee;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+    }
+
+    .info-group-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 12px;
+    }
+
+    .info-items {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+    }
+
+    .info-item {
+        padding: 4px;
+    }
+
+    .info-label {
+        color: #666;
+        font-size: 11px;
+        margin-bottom: 4px;
+    }
+
+    .info-value {
+        color: #333;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .bio {
+        margin-top: 4px;
+    }
+
+    .bio-label {
+        color: #666;
+        font-size: 11px;
+        margin-bottom: 4px;
+    }
+
+    .bio-content {
+        color: #333;
+        font-size: 12px;
+        line-height: 1.5;
+        max-height: 60px;
+        overflow-y: auto;
+    }
+
+    /* 排行榜样式 */
+    .leaderboard-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .leaderboard-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+    }
+
+    .leaderboard-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: var(--avatar-color, rgba(0, 0, 0, 0.1));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+        font-weight: 500;
+        overflow: hidden;
+    }
+
+    .leaderboard-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
     }
 </style>
 {% endblock %}
@@ -606,6 +785,71 @@
     </div>
 </div>
 
+<!-- 用户信息弹窗 -->
+<div class="user-info-popup" id="userInfoPopup">
+    <div class="popup-header">
+        <div class="popup-avatar">
+            <img id="popupUserAvatar" src="" alt="">
+            <div id="popupUserInitial" class="default-avatar"></div>
+        </div>
+        <div class="popup-info">
+            <h3 id="popupUsername"></h3>
+            <small id="popupJoinDate"></small>
+        </div>
+    </div>
+    <div class="popup-body">
+        <!-- 発音練習・スピーチ -->
+        <div class="info-group">
+            <div class="info-group-title">発音練習・スピーチ</div>
+            <div class="info-items">
+                <div class="info-item">
+                    <div class="info-label">読む</div>
+                    <div id="popupReadingScore" class="info-value">0.0</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">スピーチ</div>
+                    <div id="popupTopicScore" class="info-value">0.0</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">総練習回数</div>
+                    <div id="popupTotalPractices" class="info-value">0</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">総学習時間</div>
+                    <div id="popupTotalStudyTime" class="info-value">0分</div>
+                </div>
+            </div>
+        </div>
+        <!-- プロフィール -->
+        <div class="info-group">
+            <div class="info-group-title">プロフィール</div>
+            <div class="info-items">
+                <div class="info-item">
+                    <div class="info-label">誕生日</div>
+                    <div id="popupBirthday" class="info-value">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">星座</div>
+                    <div id="popupZodiac" class="info-value">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">MBTI</div>
+                    <div id="popupMBTI" class="info-value">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">連続学習日数</div>
+                    <div id="popupStreakDays" class="info-value">0日</div>
+                </div>
+            </div>
+        </div>
+        <!-- 自己紹介 -->
+        <div class="bio">
+            <div class="bio-label">自己紹介</div>
+            <div id="popupBio" class="bio-content">-</div>
+        </div>
+    </div>
+</div>
+
 <footer id=footeralert>  </footer>
 {% endblock %}
 
@@ -626,5 +870,132 @@ function toggleRecords(recordsId) {
         button.innerHTML = '詳細記録を表示 ▼';
     }
 }
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userInfoPopup = document.getElementById('userInfoPopup');
+    const leaderboardUsers = document.querySelectorAll('.leaderboard-user');
+    
+    // 设置默认头像颜色
+    function getRandomColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const hue = hash % 360;
+        return `hsl(${hue}, 70%, 45%)`;
+    }
+
+    document.querySelectorAll('.leaderboard-avatar').forEach(avatar => {
+        if (!avatar.querySelector('img')) {
+            const username = avatar.textContent.trim();
+            avatar.style.setProperty('--avatar-color', getRandomColor(username));
+        }
+    });
+
+    // 处理鼠标悬停事件
+    leaderboardUsers.forEach(user => {
+        let timeout;
+        
+        user.addEventListener('mouseenter', async function(e) {
+            const userId = this.closest('.leaderboard-row').dataset.userId;
+            clearTimeout(timeout);
+            
+            try {
+                const response = await fetch(`/api/user/${userId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const user = data.user;
+                    
+                    // 更新弹窗内容
+                    document.getElementById('popupUsername').textContent = user.username;
+                    document.getElementById('popupJoinDate').textContent = `会員登録: ${user.created_at}`;
+                    document.getElementById('popupReadingScore').textContent = 
+                        (user.avg_reading_score || 0).toFixed(1);
+                    document.getElementById('popupTopicScore').textContent = 
+                        (user.avg_topic_score || 0).toFixed(1);
+                    document.getElementById('popupTotalPractices').textContent = 
+                        user.total_practices || 0;
+                    document.getElementById('popupTotalStudyTime').textContent = 
+                        `${user.total_study_time || 0}分`;
+                    document.getElementById('popupStreakDays').textContent = 
+                        `${user.streak_days || 0}日`;
+                    document.getElementById('popupLastPractice').textContent = 
+                        user.last_practice || '-';
+                    document.getElementById('popupBirthday').textContent = 
+                        user.birthday || '-';
+                    document.getElementById('popupZodiac').textContent = 
+                        user.zodiac_sign || '-';
+                    document.getElementById('popupMBTI').textContent = 
+                        user.mbti || '-';
+                    document.getElementById('popupBio').textContent = 
+                        user.bio || '-';
+                    
+                    // 处理头像显示
+                    const avatarImg = document.getElementById('popupUserAvatar');
+                    const avatarInitial = document.getElementById('popupUserInitial');
+                    
+                    if (user.avatar_data) {
+                        avatarImg.src = user.avatar_data;
+                        avatarImg.style.display = 'block';
+                        avatarInitial.style.display = 'none';
+                    } else {
+                        avatarImg.style.display = 'none';
+                        avatarInitial.style.display = 'flex';
+                        avatarInitial.textContent = user.username[0];
+                        avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
+                    }
+                    
+                    // 计算弹窗位置
+                    const rect = this.getBoundingClientRect();
+                    const popupRect = userInfoPopup.getBoundingClientRect();
+                    const windowWidth = window.innerWidth;
+                    const windowHeight = window.innerHeight;
+                    
+                    // 默认显示在右侧
+                    let left = rect.right + 10;
+                    let top = rect.top;
+                    
+                    // 如果右侧空间不足，显示在左侧
+                    if (left + popupRect.width > windowWidth) {
+                        left = rect.left - popupRect.width - 10;
+                    }
+                    
+                    // 如果底部空间不足，向上偏移
+                    if (top + popupRect.height > windowHeight) {
+                        top = windowHeight - popupRect.height - 10;
+                    }
+                    
+                    // 设置弹窗位置
+                    userInfoPopup.style.left = `${left}px`;
+                    userInfoPopup.style.top = `${top}px`;
+                    
+                    // 显示弹窗
+                    userInfoPopup.classList.add('show');
+                }
+            } catch (error) {
+                console.error('Error fetching user info:', error);
+            }
+        });
+
+        user.addEventListener('mouseleave', function() {
+            // 添加延迟，避免鼠标移动到弹窗时立即关闭
+            timeout = setTimeout(() => {
+                userInfoPopup.classList.remove('show');
+            }, 300);
+        });
+    });
+
+    // 允许鼠标移动到弹窗上
+    userInfoPopup.addEventListener('mouseenter', () => {
+        clearTimeout(timeout);
+    });
+
+    userInfoPopup.addEventListener('mouseleave', () => {
+        userInfoPopup.classList.remove('show');
+    });
+});
 </script>
 {% endblock %}
