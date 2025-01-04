@@ -69,7 +69,7 @@ function initializeForum() {
     function bindUserInfoEvents() {
         const authors = document.querySelectorAll('.post-author');
         authors.forEach(author => {
-            author.addEventListener('mouseenter', async function (e) {
+            author.addEventListener('click', async function (e) {
                 e.stopPropagation();
                 const userId = this.dataset.userId;
                 if (!userId) return;
@@ -85,24 +85,13 @@ function initializeForum() {
                         // 更新弹窗内容
                         document.getElementById('forumPopupUsername').textContent = user.username;
                         document.getElementById('forumPopupJoinDate').textContent = `会員登録: ${user.created_at}`;
-                        document.getElementById('forumPopupReadingScore').textContent =
-                            (user.avg_reading_score || 0).toFixed(1);
-                        document.getElementById('forumPopupTopicScore').textContent =
-                            (user.avg_topic_score || 0).toFixed(1);
-                        document.getElementById('forumPopupTotalPractices').textContent =
-                            user.total_practices || 0;
-                        document.getElementById('forumPopupTotalStudyTime').textContent =
-                            `${user.total_study_time || 0}分`;
-                        document.getElementById('forumPopupStreakDays').textContent =
-                            `${user.streak_days || 0}日`;
-                        document.getElementById('forumPopupBirthday').textContent =
-                            user.birthday || '-';
-                        document.getElementById('forumPopupZodiac').textContent =
-                            user.zodiac_sign || '-';
-                        document.getElementById('forumPopupMBTI').textContent =
-                            user.mbti || '-';
-                        document.getElementById('forumPopupBio').textContent =
-                            user.bio || '-';
+                        document.getElementById('forumPopupPostCount').textContent = user.post_count || 0;
+                        document.getElementById('forumPopupCommentCount').textContent = user.comment_count || 0;
+                        document.getElementById('forumPopupTotalPractices').textContent = user.total_practices || 0;
+                        document.getElementById('forumPopupTotalStudyTime').textContent = `${user.total_study_time || 0}分`;
+                        document.getElementById('forumPopupStreakDays').textContent = `${user.streak_days || 0}日`;
+                        document.getElementById('forumPopupReadingScore').textContent = (user.avg_reading_score || 0).toFixed(1);
+                        document.getElementById('forumPopupBio').textContent = user.bio || '-';
 
                         // 处理头像显示
                         const avatarImg = document.getElementById('forumPopupUserAvatar');
@@ -119,43 +108,24 @@ function initializeForum() {
                             avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
                         }
 
-                        // 计算弹窗位置
-                        const rect = this.getBoundingClientRect();
-                        const viewportWidth = window.innerWidth;
-                        const popupWidth = 300;
-
-                        let left = rect.right + 10;
-                        if (left + popupWidth > viewportWidth) {
-                            left = rect.left - popupWidth - 10;
-                        }
-
-                        popup.style.left = `${left}px`;
-                        popup.style.top = `${rect.top}px`;
+                        // 设置弹窗位置为左侧固定位置
+                        popup.style.left = '20px';
+                        popup.style.top = '50%';
+                        popup.style.transform = 'translateY(-50%)';
                         popup.classList.add('show');
                     }
                 } catch (error) {
                     console.error('Error fetching user info:', error);
                 }
             });
+        });
 
-            author.addEventListener('mouseleave', function (e) {
-                const popup = document.getElementById('forumUserInfoPopup');
-                const rect = popup.getBoundingClientRect();
-
-                // 检查鼠标是否移动到了弹窗上
-                if (
-                    e.clientX < rect.left ||
-                    e.clientX > rect.right ||
-                    e.clientY < rect.top ||
-                    e.clientY > rect.bottom
-                ) {
-                    setTimeout(() => {
-                        if (!popup.matches(':hover')) {
-                            popup.classList.remove('show');
-                        }
-                    }, 200);
-                }
-            });
+        // 点击其他地方关闭弹窗
+        document.addEventListener('click', (e) => {
+            const popup = document.getElementById('forumUserInfoPopup');
+            if (!popup.contains(e.target) && !e.target.closest('.post-author')) {
+                popup.classList.remove('show');
+            }
         });
     }
 
@@ -207,9 +177,8 @@ function initializeForum() {
 
         // 添加用户信息弹窗事件
         const authorElement = div.querySelector('.post-author');
-        authorElement.addEventListener('mouseenter', function (e) {
+        authorElement.addEventListener('click', function (e) {
             e.stopPropagation();
-            const rect = this.getBoundingClientRect();
             const userId = this.dataset.userId;
 
             fetch(`/api/user/${userId}`)
@@ -222,24 +191,13 @@ function initializeForum() {
                         // 更新弹窗内容
                         document.getElementById('forumPopupUsername').textContent = user.username;
                         document.getElementById('forumPopupJoinDate').textContent = `会員登録: ${user.created_at}`;
-                        document.getElementById('forumPopupReadingScore').textContent =
-                            (user.avg_reading_score || 0).toFixed(1);
-                        document.getElementById('forumPopupTopicScore').textContent =
-                            (user.avg_topic_score || 0).toFixed(1);
-                        document.getElementById('forumPopupTotalPractices').textContent =
-                            user.total_practices || 0;
-                        document.getElementById('forumPopupTotalStudyTime').textContent =
-                            `${user.total_study_time || 0}分`;
-                        document.getElementById('forumPopupStreakDays').textContent =
-                            `${user.streak_days || 0}日`;
-                        document.getElementById('forumPopupBirthday').textContent =
-                            user.birthday || '-';
-                        document.getElementById('forumPopupZodiac').textContent =
-                            user.zodiac_sign || '-';
-                        document.getElementById('forumPopupMBTI').textContent =
-                            user.mbti || '-';
-                        document.getElementById('forumPopupBio').textContent =
-                            user.bio || '-';
+                        document.getElementById('forumPopupPostCount').textContent = user.post_count || 0;
+                        document.getElementById('forumPopupCommentCount').textContent = user.comment_count || 0;
+                        document.getElementById('forumPopupTotalPractices').textContent = user.total_practices || 0;
+                        document.getElementById('forumPopupTotalStudyTime').textContent = `${user.total_study_time || 0}分`;
+                        document.getElementById('forumPopupStreakDays').textContent = `${user.streak_days || 0}日`;
+                        document.getElementById('forumPopupReadingScore').textContent = (user.avg_reading_score || 0).toFixed(1);
+                        document.getElementById('forumPopupBio').textContent = user.bio || '-';
 
                         // 处理头像显示
                         const avatarImg = document.getElementById('forumPopupUserAvatar');
@@ -256,38 +214,14 @@ function initializeForum() {
                             avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
                         }
 
-                        // 计算弹窗位置
-                        const viewportWidth = window.innerWidth;
-                        const popupWidth = 300; // 弹窗宽度
-
-                        let left = rect.right + 10;
-                        if (left + popupWidth > viewportWidth) {
-                            left = rect.left - popupWidth - 10;
-                        }
-
-                        popup.style.left = `${left}px`;
-                        popup.style.top = `${rect.top}px`;
+                        // 设置弹窗位置为左侧固定位置
+                        popup.style.left = '20px';
+                        popup.style.top = '50%';
+                        popup.style.transform = 'translateY(-50%)';
                         popup.classList.add('show');
                     }
                 })
-                .catch(error => {
-                    console.error('Error fetching user info:', error);
-                });
-        });
-
-        authorElement.addEventListener('mouseleave', function (e) {
-            const popup = document.getElementById('forumUserInfoPopup');
-            const rect = popup.getBoundingClientRect();
-
-            // 检查鼠标是否移动到了弹窗上
-            if (
-                e.clientX < rect.left ||
-                e.clientX > rect.right ||
-                e.clientY < rect.top ||
-                e.clientY > rect.bottom
-            ) {
-                popup.classList.remove('show');
-            }
+                .catch(error => console.error('Error fetching user info:', error));
         });
 
         // 添加帖子点击事件
@@ -370,8 +304,52 @@ function initializeForum() {
                 // 添加用户信息弹窗功能
                 const authorInfo = document.querySelector('.post-author-info');
                 authorInfo.dataset.userId = post.author_id;
-                authorInfo.addEventListener('mouseenter', (e) => {
-                    handleUserHover(post.author_id, authorInfo);
+                authorInfo.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const userId = authorInfo.dataset.userId;
+                    if (!userId) return;
+
+                    fetch(`/api/user/${userId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                const user = data.user;
+                                const popup = document.getElementById('forumUserInfoPopup');
+
+                                // 更新弹窗内容
+                                document.getElementById('forumPopupUsername').textContent = user.username;
+                                document.getElementById('forumPopupJoinDate').textContent = `会員登録: ${user.created_at}`;
+                                document.getElementById('forumPopupPostCount').textContent = user.post_count || 0;
+                                document.getElementById('forumPopupCommentCount').textContent = user.comment_count || 0;
+                                document.getElementById('forumPopupTotalPractices').textContent = user.total_practices || 0;
+                                document.getElementById('forumPopupTotalStudyTime').textContent = `${user.total_study_time || 0}分`;
+                                document.getElementById('forumPopupStreakDays').textContent = `${user.streak_days || 0}日`;
+                                document.getElementById('forumPopupReadingScore').textContent = (user.avg_reading_score || 0).toFixed(1);
+                                document.getElementById('forumPopupBio').textContent = user.bio || '-';
+
+                                // 处理头像显示
+                                const avatarImg = document.getElementById('forumPopupUserAvatar');
+                                const avatarInitial = document.getElementById('forumPopupUserInitial');
+
+                                if (user.avatar_data) {
+                                    avatarImg.src = user.avatar_data;
+                                    avatarImg.style.display = 'block';
+                                    avatarInitial.style.display = 'none';
+                                } else {
+                                    avatarImg.style.display = 'none';
+                                    avatarInitial.style.display = 'flex';
+                                    avatarInitial.textContent = user.username[0];
+                                    avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
+                                }
+
+                                // 设置弹窗位置为左侧固定位置
+                                popup.style.left = '20px';
+                                popup.style.top = '50%';
+                                popup.style.transform = 'translateY(-50%)';
+                                popup.classList.add('show');
+                            }
+                        })
+                        .catch(error => console.error('Error fetching user info:', error));
                 });
 
                 loadComments(postId);
@@ -441,9 +419,52 @@ function initializeForum() {
 
         // 添加用户信息弹窗事件
         const authorElement = div.querySelector('.comment-author');
-        authorElement.addEventListener('mouseenter', function (e) {
+        authorElement.addEventListener('click', function (e) {
             e.stopPropagation();
-            handleUserHover(comment.author_id, this);
+            const userId = this.dataset.userId;
+            if (!userId) return;
+
+            fetch(`/api/user/${userId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const user = data.user;
+                        const popup = document.getElementById('forumUserInfoPopup');
+
+                        // 更新弹窗内容
+                        document.getElementById('forumPopupUsername').textContent = user.username;
+                        document.getElementById('forumPopupJoinDate').textContent = `会員登録: ${user.created_at}`;
+                        document.getElementById('forumPopupPostCount').textContent = user.post_count || 0;
+                        document.getElementById('forumPopupCommentCount').textContent = user.comment_count || 0;
+                        document.getElementById('forumPopupTotalPractices').textContent = user.total_practices || 0;
+                        document.getElementById('forumPopupTotalStudyTime').textContent = `${user.total_study_time || 0}分`;
+                        document.getElementById('forumPopupStreakDays').textContent = `${user.streak_days || 0}日`;
+                        document.getElementById('forumPopupReadingScore').textContent = (user.avg_reading_score || 0).toFixed(1);
+                        document.getElementById('forumPopupBio').textContent = user.bio || '-';
+
+                        // 处理头像显示
+                        const avatarImg = document.getElementById('forumPopupUserAvatar');
+                        const avatarInitial = document.getElementById('forumPopupUserInitial');
+
+                        if (user.avatar_data) {
+                            avatarImg.src = user.avatar_data;
+                            avatarImg.style.display = 'block';
+                            avatarInitial.style.display = 'none';
+                        } else {
+                            avatarImg.style.display = 'none';
+                            avatarInitial.style.display = 'flex';
+                            avatarInitial.textContent = user.username[0];
+                            avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
+                        }
+
+                        // 设置弹窗位置为左侧固定位置
+                        popup.style.left = '20px';
+                        popup.style.top = '50%';
+                        popup.style.transform = 'translateY(-50%)';
+                        popup.classList.add('show');
+                    }
+                })
+                .catch(error => console.error('Error fetching user info:', error));
         });
 
         return div;
@@ -574,7 +595,6 @@ function initializeForum() {
             .then(response => response.json())
             .then(user => {
                 popup.innerHTML = `
-                    <div class="close-popup">&times;</div>
                     <div class="popup-header">
                         <div class="popup-avatar">
                             ${user.avatar_data
@@ -586,13 +606,31 @@ function initializeForum() {
                             <small>加入时间：${new Date(user.created_at).toLocaleDateString()}</small>
                         </div>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">发帖数</span>
-                        <span class="info-value">${user.post_count || 0}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">评论数</span>
-                        <span class="info-value">${user.comment_count || 0}</span>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">发帖</span>
+                            <span class="info-value">${user.post_count || 0}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">评论</span>
+                            <span class="info-value">${user.comment_count || 0}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">练习</span>
+                            <span class="info-value">${user.total_practices || 0}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">学习时间</span>
+                            <span class="info-value">${user.total_study_time || 0}分</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">连续学习</span>
+                            <span class="info-value">${user.streak_days || 0}天</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">平均分</span>
+                            <span class="info-value">${(user.avg_reading_score || 0).toFixed(1)}</span>
+                        </div>
                     </div>
                     ${user.bio ? `
                         <div class="bio">
@@ -604,10 +642,6 @@ function initializeForum() {
 
                 document.body.appendChild(popup);
                 currentPopup = popup;
-
-                // 添加关闭按钮事件
-                const closeBtn = popup.querySelector('.close-popup');
-                closeBtn.addEventListener('click', hideUserInfoPopup);
 
                 // 显示遮罩和弹窗
                 overlay.classList.add('show');
