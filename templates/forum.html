@@ -150,6 +150,101 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* 统一头像样式 */
+    .post-avatar, .comment-avatar, .author-avatar, .popup-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50% !important;
+        overflow: hidden;
+        background-color: var(--avatar-color, rgba(0, 0, 0, 0.1));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+    }
+
+    .post-avatar img, .comment-avatar img, .author-avatar img, .popup-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+
+    .post-author-info {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        cursor: pointer;
+    }
+
+    .post-info {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .post-info span {
+        font-size: 14px;
+        color: #666;
+    }
+
+    .post-time::before {
+        content: "•";
+        margin: 0 4px;
+        color: #999;
+    }
+
+    /* 用户信息弹窗样式 */
+    .user-info-popup {
+        position: fixed;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+        padding: 15px;
+        width: 300px;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .user-info-popup.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .user-info-popup .popup-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .user-info-popup .popup-avatar {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+    }
+
+    .user-info-popup .popup-info {
+        flex: 1;
+    }
+
+    .user-info-popup .popup-info h3 {
+        margin: 0 0 4px 0;
+        font-size: 16px;
+        color: #333;
+    }
+
+    .user-info-popup .popup-info small {
+        color: #666;
+        font-size: 12px;
+    }
+</style>
+
 {% endblock %}
 
 {% block scripts %}
