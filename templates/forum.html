@@ -61,12 +61,18 @@
         <div class="modal-body">
             <div class="post-detail">
                 <div class="post-detail-header">
-                    <div class="post-info">
-                        <span id="postAuthor"></span>
-                        <span id="postTime"></span>
+                    <div class="post-author-info">
+                        <div class="post-avatar" id="postDetailAvatar">
+                            <img id="postDetailAvatarImg" src="" alt="">
+                            <div id="postDetailAvatarInitial" class="default-avatar"></div>
+                        </div>
+                        <div class="post-info">
+                            <span id="postAuthor"></span>
+                            <span id="postTime"></span>
+                        </div>
                     </div>
-                    <h3 id="postTitle"></h3>
                 </div>
+                <h3 id="postTitle"></h3>
                 <div class="post-detail-content" id="postContent"></div>
             </div>
             
@@ -88,6 +94,54 @@
         </div>
     </div>
 </div>
+
+<!-- 用户信息弹窗 -->
+<div class="user-info-popup" id="forumUserInfoPopup">
+    <div class="popup-header">
+        <div class="popup-avatar">
+            <img id="forumPopupUserAvatar" src="" alt="">
+            <div id="forumPopupUserInitial" class="default-avatar"></div>
+        </div>
+        <div class="popup-info">
+            <h3 id="forumPopupUsername"></h3>
+            <div id="forumPopupBio" class="bio-content">-</div>
+        </div>
+        <button class="close-popup" type="button">&times;</button>
+    </div>
+    <div class="info-grid">
+        <div class="info-item">
+            <span class="info-label">发帖</span>
+            <span id="forumPopupPostCount" class="info-value">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">评论</span>
+            <span id="forumPopupCommentCount" class="info-value">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">练习</span>
+            <span id="forumPopupTotalPractices" class="info-value">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">学习时间</span>
+            <span id="forumPopupTotalStudyTime" class="info-value">0分</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">连续学习</span>
+            <span id="forumPopupStreakDays" class="info-value">0日</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">平均分</span>
+            <span id="forumPopupReadingScore" class="info-value">0.0</span>
+        </div>
+    </div>
+    <div class="user-posts">
+        <div class="user-posts-header">发帖历史</div>
+        <div id="forumPopupPosts" class="user-posts-list">
+            <!-- 帖子将通过 JavaScript 动态加载 -->
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}

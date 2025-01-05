@@ -330,9 +330,9 @@ async function loadTopicRecords() {
                 tr.innerHTML = `
                     <td>${record.date}</td>
                     <td class="truncate">${record.topic}</td>
-                    <td>${record.grammar}</td>
-                    <td>${record.content}</td>
-                    <td>${record.relevance}</td>
+                    <td class="score-value">${record.grammar}</td>
+                    <td class="score-value">${record.content}</td>
+                    <td class="score-value">${record.relevance}</td>
                 `;
                 tr.addEventListener('click', () => showRecordPopup(record, 'topic'));
                 tbody.appendChild(tr);
@@ -345,43 +345,82 @@ async function loadTopicRecords() {
 }
 
 // 加载排行榜
-async function loadLeaderboards() {
+async function loadLeaderboards(difficulty = 'easy') {
     try {
         // 加载读文章排行榜
-        const readingResponse = await fetch('/api/reading/leaderboard');
+        const readingResponse = await fetch(`/api/reading/leaderboard/${difficulty}`);
         if (!readingResponse.ok) {
             throw new Error('読み込みに失敗しました');
         }
         const readingData = await readingResponse.json();
-        const readingTbody = document.getElementById('readingLeaderboard');
-        if (readingTbody) {
-            if (readingData.length === 0) {
-                readingTbody.innerHTML = '<tr><td colspan="3">データがありません</td></tr>';
-            } else {
-                updateLeaderboard(readingData, 'readingLeaderboard');
-            }
-        }
+        updateLeaderboard(readingData, 'readingLeaderboard');
 
         // 加载Topic排行榜
-        const topicResponse = await fetch('/api/topic/leaderboard');
+        const topicResponse = await fetch(`/api/topic/leaderboard/${difficulty}`);
         if (!topicResponse.ok) {
             throw new Error('読み込みに失敗しました');
         }
         const topicData = await topicResponse.json();
-        const topicTbody = document.getElementById('topicLeaderboard');
-        if (topicTbody) {
-            if (topicData.length === 0) {
-                topicTbody.innerHTML = '<tr><td colspan="3">データがありません</td></tr>';
-            } else {
-                updateLeaderboard(topicData, 'topicLeaderboard');
-            }
-        }
+        updateLeaderboard(topicData, 'topicLeaderboard');
     } catch (error) {
         console.error('Error loading leaderboards:', error);
         const errorMessage = '<tr><td colspan="3">データの読み込みに失敗しました</td></tr>';
-        document.getElementById('readingLeaderboard').innerHTML = errorMessage;
-        document.getElementById('topicLeaderboard').innerHTML = errorMessage;
+        document.getElementById('readingLeaderboard').getElementsByTagName('tbody')[0].innerHTML = errorMessage;
+        document.getElementById('topicLeaderboard').getElementsByTagName('tbody')[0].innerHTML = errorMessage;
     }
+}
+
+function updateLeaderboard(data, elementId) {
+    const tbody = document.getElementById(elementId);
+    if (!tbody) {
+        console.error(`Element with id ${elementId} not found`);
+        return;
+    }
+
+    tbody.innerHTML = '';
+
+    // 生成10行数据，不足的用占位符填充
+    for (let i = 0; i < 10; i++) {
+        const item = data[i] || null;
+        const row = document.createElement('tr');
+        row.className = 'leaderboard-row';
+        if (item) {
+            row.dataset.userId = item.user_id;
+            row.innerHTML = `
+                <td>
+                    <span class="rank ${i < 3 ? `rank-${i + 1}` : ''}">${i + 1}</span>
+                </td>
+                <td>
+                    <div class="leaderboard-user">
+                        <div class="leaderboard-avatar">
+                            ${item.avatar_data ?
+                    `<img src="${item.avatar_data}" alt="${item.username}">` :
+                    item.username[0]
+                }
+                        </div>
+                        <span>${item.username}</span>
+                    </div>
+                </td>
+                <td><span class="info-value">${item.average_score.toFixed(1)}</span></td>
+            `;
+        } else {
+            row.innerHTML = `
+                <td>
+                    <span class="rank ${i < 3 ? `rank-${i + 1}` : ''}">${i + 1}</span>
+                </td>
+                <td>
+                    <div class="leaderboard-user">
+                        <span>-</span>
+                    </div>
+                </td>
+                <td><span class="info-value">-</span></td>
+            `;
+        }
+        tbody.appendChild(row);
+    }
+
+    // 重新绑定用户信息弹窗事件
+    bindUserPopupEvents();
 }
 
 // 刷新dashboard数据
@@ -407,138 +446,173 @@ document.addEventListener('DOMContentLoaded', () => {
         // 设置定期刷新
         setInterval(refreshDashboard, 300000); // 每5分钟刷新一次
 
-        // 监听标签切换
-        document.querySelectorAll('.nav-links a').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const tabId = e.target.getAttribute('data-tab');
+        // 处理排行榜难度切换
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const type = this.dataset.type;
+                const difficulty = this.dataset.difficulty;
 
-                // 更新URL，但不刷新页面
-                const url = new URL(window.location);
-                url.searchParams.set('active_tab', tabId);
-                window.history.pushState({}, '', url);
-
-                // 切换标签显示
-                document.querySelectorAll('.tab-content').forEach(tab => {
-                    tab.classList.remove('active');
+                // 更新按钮状态
+                document.querySelectorAll(`.tab-btn[data-type="${type}"]`).forEach(b => {
+                    b.classList.remove('active');
                 });
-                document.getElementById(tabId + 'Tab').classList.add('active');
+                this.classList.add('active');
 
-                // 更新导航栏active状态
-                document.querySelectorAll('.nav-links a').forEach(a => {
-                    a.classList.remove('active');
-                });
-                e.target.classList.add('active');
-
-                // 如果切换到dashboard，刷新数据
-                if (tabId === 'dashboard') {
-                    refreshDashboard();
+                // 加载对应难度的排行榜
+                if (type === 'reading') {
+                    fetch(`/api/reading/leaderboard/${difficulty}`)
+                        .then(response => response.json())
+                        .then(data => updateLeaderboard(data, 'readingLeaderboard'))
+                        .catch(error => {
+                            console.error('Error loading reading leaderboard:', error);
+                            document.getElementById('readingLeaderboard').innerHTML =
+                                '<tr><td colspan="3">データの読み込みに失敗しました</td></tr>';
+                        });
+                } else if (type === 'topic') {
+                    fetch(`/api/topic/leaderboard/${difficulty}`)
+                        .then(response => response.json())
+                        .then(data => updateLeaderboard(data, 'topicLeaderboard'))
+                        .catch(error => {
+                            console.error('Error loading topic leaderboard:', error);
+                            document.getElementById('topicLeaderboard').innerHTML =
+                                '<tr><td colspan="3">データの読み込みに失敗しました</td></tr>';
+                        });
                 }
             });
         });
+
+        // 初始加载排行榜
+        loadLeaderboards('easy');
     }
 });
 
-function updateLeaderboard(data, elementId) {
-    const tbody = document.getElementById(elementId);
-    tbody.innerHTML = '';
+// 绑定用户信息弹窗事件
+function bindUserPopupEvents() {
+    const userInfoPopup = document.getElementById('userInfoPopup');
+    if (!userInfoPopup) {
+        console.error('User info popup element not found');
+        return;
+    }
 
-    data.forEach((item, index) => {
-        const tr = document.createElement('tr');
+    const leaderboardUsers = document.querySelectorAll('.leaderboard-user');
+    let timeout;
 
-        // 添加排名
-        const rankTd = document.createElement('td');
-        const rankSpan = document.createElement('span');
-        rankSpan.className = `rank ${index < 3 ? `rank-${index + 1}` : 'rank-other'}`;
-        rankSpan.textContent = index + 1;
-        rankTd.appendChild(rankSpan);
+    leaderboardUsers.forEach(user => {
+        user.addEventListener('mouseenter', async function (e) {
+            const row = this.closest('.leaderboard-row');
+            if (!row) return;
 
-        // 添加用户名
-        const usernameTd = document.createElement('td');
-        const usernameSpan = document.createElement('span');
-        usernameSpan.className = 'username';
-        usernameSpan.textContent = item.username;
-        usernameTd.appendChild(usernameSpan);
+            const userId = row.dataset.userId;
+            if (!userId) return;
 
-        // 添加分数
-        const scoreTd = document.createElement('td');
-        const scoreSpan = document.createElement('span');
-        scoreSpan.className = 'score';
-        scoreSpan.textContent = item.average_score;
-        scoreTd.appendChild(scoreSpan);
+            clearTimeout(timeout);
 
-        tr.appendChild(rankTd);
-        tr.appendChild(usernameTd);
-        tr.appendChild(scoreTd);
-        tbody.appendChild(tr);
-    });
-}
+            try {
+                const response = await fetch(`/api/user/${userId}`);
+                const data = await response.json();
 
-document.addEventListener('DOMContentLoaded', function () {
-    // 初始化加载排行榜
-    loadLeaderboards('easy');
+                if (data.success) {
+                    const user = data.user;
 
-    // 处理排行榜难度切换
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const type = this.dataset.type;
-            const difficulty = this.dataset.difficulty;
+                    // 更新弹窗内容
+                    document.getElementById('popupUsername').textContent = user.username;
+                    document.getElementById('popupJoinDate').textContent = `会員登録: ${user.created_at}`;
+                    document.getElementById('popupReadingScore').textContent =
+                        (user.avg_reading_score || 0).toFixed(1);
+                    document.getElementById('popupTopicScore').textContent =
+                        (user.avg_topic_score || 0).toFixed(1);
+                    document.getElementById('popupTotalPractices').textContent =
+                        user.total_practices || 0;
+                    document.getElementById('popupTotalStudyTime').textContent =
+                        `${user.total_study_time || 0}分`;
+                    document.getElementById('popupBirthday').textContent =
+                        user.birthday || '-';
+                    document.getElementById('popupZodiac').textContent =
+                        user.zodiac_sign || '-';
+                    document.getElementById('popupMBTI').textContent =
+                        user.mbti || '-';
+                    document.getElementById('popupStreakDays').textContent =
+                        `${user.streak_days || 0}日`;
+                    document.getElementById('popupBio').textContent =
+                        user.bio || '-';
 
-            // 更新按钮状态
-            document.querySelectorAll(`.tab-btn[data-type="${type}"]`).forEach(b => {
-                b.classList.remove('active');
-            });
-            this.classList.add('active');
+                    // 处理头像显示
+                    const avatarImg = document.getElementById('popupUserAvatar');
+                    const avatarInitial = document.getElementById('popupUserInitial');
 
-            // 加载对应难度的排行榜
-            if (type === 'reading') {
-                loadReadingLeaderboard(difficulty);
-            } else if (type === 'topic') {
-                loadTopicLeaderboard(difficulty);
+                    if (user.avatar_data) {
+                        avatarImg.src = user.avatar_data;
+                        avatarImg.style.display = 'block';
+                        avatarInitial.style.display = 'none';
+                    } else {
+                        avatarImg.style.display = 'none';
+                        avatarInitial.style.display = 'flex';
+                        avatarInitial.textContent = user.username[0];
+                        avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
+                    }
+
+                    // 先显示弹窗但设为不可见，以获取实际尺寸
+                    userInfoPopup.style.visibility = 'hidden';
+                    userInfoPopup.classList.add('show');
+
+                    // 获取实际尺寸
+                    const popupHeight = userInfoPopup.offsetHeight;
+                    const popupWidth = userInfoPopup.offsetWidth;
+
+                    // 获取视口尺寸
+                    const viewportWidth = window.innerWidth;
+                    const viewportHeight = window.innerHeight;
+
+                    // 获取触发元素位置
+                    const rect = this.getBoundingClientRect();
+
+                    // 计算最佳位置
+                    let left = rect.right + 10; // 默认显示在右侧
+                    let top = rect.top;
+
+                    // 如果右侧空间不足，显示在左侧
+                    if (left + popupWidth > viewportWidth) {
+                        left = rect.left - popupWidth - 10;
+                    }
+
+                    // 确保左侧也有足够空间
+                    if (left < 10) {
+                        left = 10;
+                    }
+
+                    // 调整垂直位置
+                    if (top + popupHeight > viewportHeight) {
+                        // 如果底部空间不足，向上对齐
+                        top = viewportHeight - popupHeight - 10;
+                    }
+
+                    // 确保顶部不会超出视口
+                    if (top < 10) {
+                        top = 10;
+                    }
+
+                    // 应用位置并显示弹窗
+                    userInfoPopup.style.left = `${left}px`;
+                    userInfoPopup.style.top = `${top}px`;
+                    userInfoPopup.style.visibility = 'visible';
+                }
+            } catch (error) {
+                console.error('Error fetching user info:', error);
             }
         });
+
+        user.addEventListener('mouseleave', function () {
+            timeout = setTimeout(() => {
+                userInfoPopup.classList.remove('show');
+            }, 300);
+        });
     });
-});
 
-function loadLeaderboards(difficulty) {
-    loadReadingLeaderboard(difficulty);
-    loadTopicLeaderboard(difficulty);
-}
+    userInfoPopup.addEventListener('mouseenter', () => {
+        clearTimeout(timeout);
+    });
 
-function loadReadingLeaderboard(difficulty) {
-    fetch(`/api/reading/leaderboard/${difficulty}`)
-        .then(response => response.json())
-        .then(data => {
-            const tbody = document.getElementById('readingLeaderboard');
-            tbody.innerHTML = '';
-            data.forEach((item, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${item.username}</td>
-                    <td>${item.average_score}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        })
-        .catch(error => console.error('Error loading reading leaderboard:', error));
-}
-
-function loadTopicLeaderboard(difficulty) {
-    fetch(`/api/topic/leaderboard/${difficulty}`)
-        .then(response => response.json())
-        .then(data => {
-            const tbody = document.getElementById('topicLeaderboard');
-            tbody.innerHTML = '';
-            data.forEach((item, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${item.username}</td>
-                    <td>${item.average_score}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        })
-        .catch(error => console.error('Error loading topic leaderboard:', error));
+    userInfoPopup.addEventListener('mouseleave', () => {
+        userInfoPopup.classList.remove('show');
+    });
 } 
