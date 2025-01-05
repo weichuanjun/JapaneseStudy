@@ -10,9 +10,7 @@
 <div class="forum-container">
     <div class="forum-header">
         <h1>掲示板</h1>
-        <button id="newPostBtn" class="btn-primary" onclick="document.getElementById('newPostModal').style.display='block'">
-            <i class="fas fa-plus"></i> 新しい投稿
-        </button>
+        <button id="newPostBtn" class="btn btn-primary">新規投稿</button>
     </div>
     
     <div class="posts-container">
@@ -28,23 +26,22 @@
 <div id="newPostModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2>新しい投稿を作成</h2>
-            <span class="close">&times;</span>
+            <h2>新規投稿</h2>
+            <button type="button" class="close">&times;</button>
         </div>
         <div class="modal-body">
             <form id="newPostForm">
                 <div class="form-group">
-                    <label for="title">タイトル</label>
-                    <input type="text" name="title" id="title" required>
+                    <label for="postTitle">タイトル</label>
+                    <input type="text" id="postTitle" name="title" required>
                 </div>
                 <div class="form-group">
-                    <label for="content">内容</label>
-                    <textarea name="content" id="content" required></textarea>
-                    <div class="hint">@momoを入力すると、AIアシスタントが返信します</div>
+                    <label for="postContent">内容</label>
+                    <textarea id="postContent" name="content" required></textarea>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary close-modal">キャンセル</button>
-                    <button type="submit" class="btn-primary">投稿</button>
+                    <button type="button" class="btn btn-secondary close-modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">投稿</button>
                 </div>
             </form>
         </div>
@@ -55,25 +52,25 @@
 <div id="postDetailModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2>投稿詳細</h2>
-            <span class="close">&times;</span>
+            <h2>投稿の詳細</h2>
+            <button type="button" class="close">&times;</button>
         </div>
         <div class="modal-body">
             <div class="post-detail">
                 <div class="post-detail-header">
                     <div class="post-author-info">
-                        <div class="post-avatar" id="postDetailAvatar">
-                            <img id="postDetailAvatarImg" src="" alt="">
+                        <div id="postDetailAvatar" class="post-avatar">
+                            <img id="postDetailAvatarImg" src="" alt="" style="display: none;">
                             <div id="postDetailAvatarInitial" class="default-avatar"></div>
                         </div>
                         <div class="post-info">
                             <span id="postAuthor"></span>
-                            <span id="postTime"></span>
+                            <span id="postTime" class="post-time"></span>
                         </div>
                     </div>
                 </div>
-                <h3 id="postTitle"></h3>
-                <div class="post-detail-content" id="postContent"></div>
+                <h1 id="postTitle"></h1>
+                <div id="postContent" class="post-detail-content"></div>
             </div>
             
             <div class="comments-section">
@@ -110,32 +107,32 @@
     </div>
     <div class="info-grid">
         <div class="info-item">
-            <span class="info-label">发帖</span>
-            <span id="forumPopupPostCount" class="info-value">0</span>
+            <span class="info-label">読書スコア</span>
+            <span id="forumPopupReadingScore" class="info-value">-</span>
         </div>
         <div class="info-item">
-            <span class="info-label">评论</span>
-            <span id="forumPopupCommentCount" class="info-value">0</span>
+            <span class="info-label">投稿数</span>
+            <span id="forumPopupPostCount" class="info-value">-</span>
         </div>
         <div class="info-item">
-            <span class="info-label">练习</span>
-            <span id="forumPopupTotalPractices" class="info-value">0</span>
+            <span class="info-label">コメント数</span>
+            <span id="forumPopupCommentCount" class="info-value">-</span>
         </div>
         <div class="info-item">
-            <span class="info-label">学习时间</span>
-            <span id="forumPopupTotalStudyTime" class="info-value">0分</span>
+            <span class="info-label">練習回数</span>
+            <span id="forumPopupTotalPractices" class="info-value">-</span>
         </div>
         <div class="info-item">
-            <span class="info-label">连续学习</span>
-            <span id="forumPopupStreakDays" class="info-value">0日</span>
+            <span class="info-label">学習時間</span>
+            <span id="forumPopupTotalStudyTime" class="info-value">-</span>
         </div>
         <div class="info-item">
-            <span class="info-label">平均分</span>
-            <span id="forumPopupReadingScore" class="info-value">0.0</span>
+            <span class="info-label">連続学習</span>
+            <span id="forumPopupStreakDays" class="info-value">-</span>
         </div>
     </div>
     <div class="user-posts">
-        <div class="user-posts-header">发帖历史</div>
+        <h4 class="user-posts-header">投稿履歴</h4>
         <div id="forumPopupPosts" class="user-posts-list">
             <!-- 帖子将通过 JavaScript 动态加载 -->
         </div>
