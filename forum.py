@@ -348,6 +348,9 @@ def create_comment(post_id):
         # 获取用户信息
         user = User.query.get(user_id)
         
+        # 获取更新后的评论数
+        updated_comment_count = Comment.query.filter_by(post_id=post_id).count()
+        
         # 准备响应数据
         response_data = {
             'id': comment.id,
@@ -355,7 +358,8 @@ def create_comment(post_id):
             'author_id': user_id,
             'author_name': user.username,
             'author_avatar_data': user.avatar_data if user.avatar_data else None,
-            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_comment_count': updated_comment_count  # 添加更新后的评论数
         }
         
         # 检查是否包含 @momo，在后台异步处理 AI 回复

@@ -961,11 +961,27 @@ body.modal-open {
     margin-bottom: 8px;
 }
 
-.tag-input-container input {
+.tag-select {
     flex: 1;
     padding: 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+}
+
+.new-tag-input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.tag-select:focus,
+.new-tag-input:focus {
+    border-color: #4a90e2;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
 }
 
 .selected-tags {
