@@ -9,7 +9,9 @@
 {% block content %}
 <div class="forum-container">
     <div class="forum-header">
-        <h1>掲示板</h1>
+        <div class="tag-filter-container">
+            <!-- タグはJavaScriptで動的に読み込まれます -->
+        </div>
         <button id="newPostBtn" class="btn-primary" onclick="document.getElementById('newPostModal').style.display='block'">
             <i class="fas fa-plus"></i> 新しい投稿
         </button>
@@ -36,6 +38,19 @@
                 <div class="form-group">
                     <label for="title">タイトル</label>
                     <input type="text" name="title" id="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="tag">タグ</label>
+                    <div class="tag-input-container">
+                        <input type="text" name="tag" id="tag" list="tagList" placeholder="タグを入力または選択">
+                        <datalist id="tagList">
+                            <!-- タグリストはJavaScriptで動的に読み込まれます -->
+                        </datalist>
+                        <button type="button" id="addTagBtn" class="btn-secondary">追加</button>
+                    </div>
+                    <div id="selectedTags" class="selected-tags">
+                        <!-- 選択されたタグはJavaScriptで動的に表示されます -->
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="content">内容</label>
@@ -73,6 +88,9 @@
                     </div>
                 </div>
                 <h3 id="postTitle"></h3>
+                <div id="postTags" class="post-tags">
+                    <!-- タグはJavaScriptで動的に表示されます -->
+                </div>
                 <div class="post-detail-content" id="postContent"></div>
             </div>
             

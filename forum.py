@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for, current_app
-from models import db, Post, Comment, User
+from models import db, Post, Comment, User, Tag
 import google.generativeai as genai
 from config import GEMINI_API_KEY, GEMINI_MODEL
 import logging
@@ -160,17 +160,26 @@ def forum_page():
 @forum_bp.route('/api/posts', methods=['GET'])
 @login_required
 def get_posts():
-    """获取帖子列表"""
+    """获取帖子列表，支持标签过滤"""
     try:
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
+        tag_id = request.args.get('tag_id', type=int)
         
-        # 获取帖子并包含用户信息
-        posts = db.session.query(Post, User).join(User, Post.user_id == User.id)\
-            .order_by(Post.created_at.desc())\
-            .paginate(page=page, per_page=per_page, error_out=False)
+        # 构建查询
+        query = db.session.query(Post, User).join(User, Post.user_id == User.id)
         
-        # 构建响应数据，包含用户名和头像
+        # 如果指定了标签，添加标签过滤
+        if tag_id:
+            query = query.join(Post.tags).filter(Tag.id == tag_id)
+            
+        # 添加排序
+        query = query.order_by(Post.created_at.desc())
+        
+        # 执行分页
+        posts = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # 构建响应数据
         posts_data = [{
             'id': post.Post.id,
             'title': post.Post.title,
@@ -179,7 +188,12 @@ def get_posts():
             'author_name': post.User.username,
             'avatar_data': post.User.avatar_data if post.User.avatar_data else None,
             'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'comment_count': Comment.query.filter_by(post_id=post.Post.id).count()
+            'comment_count': Comment.query.filter_by(post_id=post.Post.id).count(),
+            'tags': [{
+                'id': tag.id,
+                'name': tag.name,
+                'color': tag.color
+            } for tag in post.Post.tags]
         } for post in posts.items]
         
         return jsonify({
@@ -190,14 +204,13 @@ def get_posts():
         })
     except Exception as e:
         logging.error(f"获取帖子列表时出错: {str(e)}")
-        return jsonify({'error': '获取帖子列表失败'}), 500
+        return jsonify({'error': '投稿の取得に失敗しました'}), 500
 
 @forum_bp.route('/api/posts/<int:post_id>', methods=['GET'])
 @login_required
 def get_post(post_id):
-    """获取帖子详情"""
+    """获取帖子详情，包含标签信息"""
     try:
-        # 获取帖子并包含用户信息
         post = db.session.query(Post, User)\
             .join(User, Post.user_id == User.id)\
             .filter(Post.id == post_id)\
@@ -210,11 +223,16 @@ def get_post(post_id):
             'author_id': post.User.id,
             'author_name': post.User.username,
             'author_avatar_data': post.User.avatar_data if post.User.avatar_data else None,
-            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'tags': [{
+                'id': tag.id,
+                'name': tag.name,
+                'color': tag.color
+            } for tag in post.Post.tags]
         })
     except Exception as e:
         logging.error(f"获取帖子详情时出错: {str(e)}")
-        return jsonify({'error': '获取帖子详情失败'}), 500
+        return jsonify({'error': '投稿の詳細の取得に失敗しました'}), 500
 
 @forum_bp.route('/api/posts/<int:post_id>/comments', methods=['GET'])
 @login_required
@@ -243,53 +261,56 @@ def get_comments(post_id):
 @forum_bp.route('/api/posts', methods=['POST'])
 @login_required
 def create_post():
-    """创建新帖子"""
+    """创建新帖子，支持标签"""
     try:
         data = request.get_json()
         if not data:
-            return jsonify({'error': '无效的请求数据'}), 400
+            return jsonify({'error': '無効なリクエストデータです'}), 400
             
         title = data.get('title')
         content = data.get('content')
-        user_id = session['user_id']
+        tag_ids = data.get('tag_ids', [])
         
-        if not all([title, content]):
-            return jsonify({'error': '缺少必要字段'}), 400
+        if not title or not content:
+            return jsonify({'error': 'タイトルと内容は必須です'}), 400
             
+        # 创建帖子
         post = Post(
             title=title,
             content=content,
-            user_id=user_id,
-            created_at=datetime.now()
+            user_id=session['user_id']
         )
         
+        # 添加标签
+        if tag_ids:
+            tags = Tag.query.filter(Tag.id.in_(tag_ids)).all()
+            post.tags.extend(tags)
+            
         db.session.add(post)
         db.session.commit()
         
-        # 获取用户信息
-        user = User.query.get(user_id)
+        # 检查是否需要AI回复
+        if '@momo' in content.lower():
+            thread = threading.Thread(target=add_ai_response_with_app, 
+                                   args=(current_app._get_current_object(), post.id, content))
+            thread.start()
         
-        # 准备响应数据
-        response_data = {
+        return jsonify({
             'id': post.id,
             'title': post.title,
             'content': post.content,
-            'author_id': user_id,
-            'author_name': user.username,
-            'avatar_data': user.avatar_data if user.avatar_data else None,
+            'author_name': post.user.username,
             'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'comment_count': 0
-        }
-        
-        # 如果内容包含@momo，添加AI回复
-        if '@momo' in content.lower():
-            add_ai_response(post.id, content)
-        
-        return jsonify(response_data)
+            'tags': [{
+                'id': tag.id,
+                'name': tag.name,
+                'color': tag.color
+            } for tag in post.tags]
+        })
     except Exception as e:
         db.session.rollback()
         logging.error(f"创建帖子时出错: {str(e)}")
-        return jsonify({'error': '创建帖子失败'}), 500
+        return jsonify({'error': '投稿の作成に失敗しました'}), 500
 
 def add_ai_response_with_app(app, post_id, content):
     """在应用上下文中添加 AI 回复"""
@@ -421,3 +442,57 @@ def get_user_posts(user_id):
             'success': False,
             'error': '获取用户帖子列表失败'
         }), 500 
+
+@forum_bp.route('/api/tags', methods=['GET'])
+@login_required
+def get_tags():
+    """获取所有标签"""
+    try:
+        tags = Tag.query.all()
+        return jsonify([{
+            'id': tag.id,
+            'name': tag.name,
+            'color': tag.color
+        } for tag in tags])
+    except Exception as e:
+        logging.error(f"获取标签列表时出错: {str(e)}")
+        return jsonify({'error': 'タグの取得に失敗しました'}), 500
+
+@forum_bp.route('/api/tags', methods=['POST'])
+@login_required
+def create_tag():
+    """创建新标签或获取已存在的标签"""
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        if not name:
+            return jsonify({'error': 'タグ名は必須です'}), 400
+
+        # 检查标签是否已存在
+        tag = Tag.query.filter_by(name=name).first()
+        if tag:
+            return jsonify({
+                'id': tag.id,
+                'name': tag.name,
+                'color': tag.color
+            })
+
+        # 生成柔和的颜色
+        import random
+        hue = random.randint(0, 360)
+        color = f"hsl({hue}, 70%, 80%)"
+
+        # 创建新标签
+        tag = Tag(name=name, color=color)
+        db.session.add(tag)
+        db.session.commit()
+
+        return jsonify({
+            'id': tag.id,
+            'name': tag.name,
+            'color': tag.color
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"创建标签时出错: {str(e)}")
+        return jsonify({'error': 'タグの作成に失敗しました'}), 500 
