@@ -21,6 +21,7 @@ from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
+from ai_advisor import get_greeting, get_learning_advice
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
@@ -1012,3 +1013,36 @@ def get_user_info(user_id):
             'created_at': user.created_at.strftime('%Y年%m月%d日')
         }
     })
+
+@app.route("/api/dashboard/greeting")
+@login_required
+def get_user_greeting():
+    user = User.query.get(session['user_id'])
+    return jsonify({
+        "greeting": get_greeting(user.username)
+    })
+
+@app.route("/api/dashboard/advice")
+@login_required
+def get_user_advice():
+    try:
+        logging.info(f"用户 {session['user_id']} 请求学习建议")
+        advice = get_learning_advice(session['user_id'])
+        
+        if "エラー" in advice or "失敗" in advice:
+            logging.error(f"生成建议失败: {advice}")
+            return jsonify({
+                "success": False,
+                "error": advice
+            }), 500
+            
+        return jsonify({
+            "success": True,
+            "advice": advice
+        })
+    except Exception as e:
+        logging.error(f"获取学习建议时出错: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": "アドバイスの生成に失敗しました。しばらくしてからもう一度お試しください。"
+        }), 500
