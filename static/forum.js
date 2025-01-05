@@ -1,60 +1,246 @@
 // 全局变量
 let currentPage = 1;
 let currentPostId = null;
+let currentPopupCloseHandler = null;  // 添加全局变量来跟踪当前的点击外部关闭处理器
 
 // 统一的用户信息显示函数
-function showUserInfo(userId) {
-    if (!userId) return;
+function showUserInfo(userId, clickEvent) {
+    if (!userId) {
+        console.error('No userId provided');
+        return;
+    }
+
+    // 检查所有必需的 DOM 元素
+    const elements = {
+        popup: document.getElementById('forumUserInfoPopup'),
+        username: document.getElementById('forumPopupUsername'),
+        bio: document.getElementById('forumPopupBio'),
+        readingScore: document.getElementById('forumPopupReadingScore'),
+        postCount: document.getElementById('forumPopupPostCount'),
+        commentCount: document.getElementById('forumPopupCommentCount'),
+        totalPractices: document.getElementById('forumPopupTotalPractices'),
+        totalStudyTime: document.getElementById('forumPopupTotalStudyTime'),
+        streakDays: document.getElementById('forumPopupStreakDays'),
+        avatarImg: document.getElementById('forumPopupUserAvatar'),
+        avatarInitial: document.getElementById('forumPopupUserInitial'),
+        posts: document.getElementById('forumPopupPosts')
+    };
+
+    // 检查是否所有元素都存在
+    for (const [key, element] of Object.entries(elements)) {
+        if (!element) {
+            console.error(`Required element not found: ${key}`);
+            return;
+        }
+    }
+
+    // 如果已经有弹窗打开，先移除之前的事件监听器
+    if (currentPopupCloseHandler) {
+        document.removeEventListener('click', currentPopupCloseHandler);
+        currentPopupCloseHandler = null;
+    }
 
     fetch(`/forum/api/user/${userId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 const user = data.user;
-                const popup = document.getElementById('forumUserInfoPopup');
 
-                // 更新弹窗内容
-                document.getElementById('forumPopupUsername').textContent = user.username;
-                document.getElementById('forumPopupJoinDate').textContent = `会員登録: ${user.created_at}`;
-                document.getElementById('forumPopupReadingScore').textContent = (user.avg_reading_score || 0).toFixed(1);
-                document.getElementById('forumPopupTopicScore').textContent = (user.avg_topic_score || 0).toFixed(1);
-                document.getElementById('forumPopupBirthday').textContent = user.birthday || '-';
-                document.getElementById('forumPopupMBTI').textContent = user.mbti || '-';
-                document.getElementById('forumPopupPostCount').textContent = user.post_count || 0;
-                document.getElementById('forumPopupCommentCount').textContent = user.comment_count || 0;
-                document.getElementById('forumPopupBio').textContent = user.bio || '-';
+                try {
+                    // 更新弹窗内容
+                    elements.username.textContent = user.username;
+                    elements.bio.textContent = user.bio || '-';
+                    elements.readingScore.textContent = (user.avg_reading_score || 0).toFixed(1);
+                    elements.postCount.textContent = user.post_count || 0;
+                    elements.commentCount.textContent = user.comment_count || 0;
+                    elements.totalPractices.textContent = user.total_practices || 0;
+                    elements.totalStudyTime.textContent = `${user.total_study_time || 0}分`;
+                    elements.streakDays.textContent = `${user.streak_days || 0}日`;
 
-                // 处理头像显示
-                const avatarImg = document.getElementById('forumPopupUserAvatar');
-                const avatarInitial = document.getElementById('forumPopupUserInitial');
-
-                if (user.avatar_data) {
-                    avatarImg.src = user.avatar_data;
-                    avatarImg.style.display = 'block';
-                    avatarInitial.style.display = 'none';
-                } else {
-                    avatarImg.style.display = 'none';
-                    avatarInitial.style.display = 'flex';
-                    avatarInitial.textContent = user.username[0];
-                    avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
-                }
-
-                // 设置弹窗位置为左侧固定位置
-                popup.style.left = '20px';
-                popup.style.top = '50%';
-                popup.style.transform = 'translateY(-50%)';
-                popup.classList.add('show');
-
-                // 添加点击外部关闭功能
-                document.addEventListener('click', function closePopup(e) {
-                    if (!popup.contains(e.target) && !e.target.closest('.post-author')) {
-                        popup.classList.remove('show');
-                        document.removeEventListener('click', closePopup);
+                    // 处理头像显示
+                    if (user.avatar_data) {
+                        elements.avatarImg.src = user.avatar_data;
+                        elements.avatarImg.style.display = 'block';
+                        elements.avatarInitial.style.display = 'none';
+                    } else {
+                        elements.avatarImg.style.display = 'none';
+                        elements.avatarInitial.style.display = 'flex';
+                        elements.avatarInitial.textContent = user.username[0];
+                        elements.avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
                     }
-                });
+
+                    // 加载用户的帖子列表
+                    loadUserPosts(userId);
+
+                    // 检查是否在帖子详情模态框中
+                    const postDetailModal = document.getElementById('postDetailModal');
+                    const isInModal = postDetailModal && postDetailModal.style.display === 'block';
+
+                    // 重置弹窗状态并显示
+                    elements.popup.style.opacity = '0';
+                    elements.popup.style.display = 'block';
+
+                    // 根据不同场景放置弹窗
+                    if (isInModal) {
+                        // 在帖子详情模态框中
+                        const modalContent = postDetailModal.querySelector('.modal-content');
+                        if (modalContent) {
+                            modalContent.appendChild(elements.popup);
+                            elements.popup.style.position = 'absolute';
+                            elements.popup.style.left = '20px';
+                            elements.popup.style.top = '80px';
+                        }
+                    } else {
+                        // 在主页面中
+                        document.body.appendChild(elements.popup);
+
+                        let targetRect;
+                        if (clickEvent && clickEvent.currentTarget) {
+                            targetRect = clickEvent.currentTarget.getBoundingClientRect();
+                        } else {
+                            // 如果没有点击事件，使用默认位置（屏幕中心）
+                            targetRect = {
+                                left: window.innerWidth / 2,
+                                right: window.innerWidth / 2,
+                                top: window.innerHeight / 2,
+                                height: 0
+                            };
+                        }
+
+                        // 计算弹窗位置
+                        const popupWidth = elements.popup.offsetWidth;
+                        const viewportWidth = window.innerWidth;
+                        const viewportHeight = window.innerHeight;
+
+                        // 默认显示在目标元素的左侧
+                        let left = targetRect.left - popupWidth - 10;
+
+                        // 如果左侧空间不足，则显示在右侧
+                        if (left < 10) {
+                            left = targetRect.right + 10;
+                        }
+
+                        // 确保不超出视口右边界
+                        if (left + popupWidth > viewportWidth - 10) {
+                            left = viewportWidth - popupWidth - 10;
+                        }
+
+                        // 垂直居中对齐，但确保不超出视口
+                        let top = targetRect.top + (targetRect.height / 2);
+                        const popupHeight = elements.popup.offsetHeight;
+
+                        // 如果弹窗高度超过视口高度的80%，设置最大高度
+                        if (popupHeight > viewportHeight * 0.8) {
+                            elements.popup.style.maxHeight = `${viewportHeight * 0.8}px`;
+                            top = viewportHeight * 0.1; // 距离顶部10%
+                        } else {
+                            // 确保弹窗完全在视口内
+                            top = Math.max(10, Math.min(viewportHeight - popupHeight - 10, top - popupHeight / 2));
+                        }
+
+                        // 设置位置
+                        elements.popup.style.position = 'fixed';
+                        elements.popup.style.left = `${left}px`;
+                        elements.popup.style.top = `${top}px`;
+                    }
+
+                    // 强制重排后显示
+                    void elements.popup.offsetHeight;
+                    elements.popup.style.opacity = '1';
+                    elements.popup.classList.add('show');
+
+                    // 处理关闭按钮点击事件
+                    const closeBtn = elements.popup.querySelector('.close-popup');
+                    if (closeBtn) {
+                        closeBtn.onclick = function (e) {
+                            e.stopPropagation();
+                            hideUserInfoPopup();
+                        };
+                    }
+
+                    // 添加点击外部关闭功能
+                    currentPopupCloseHandler = function (e) {
+                        if (!elements.popup.contains(e.target) &&
+                            !e.target.closest('.post-author') &&
+                            !e.target.closest('.comment-author') &&
+                            !e.target.closest('.post-author-info')) {
+                            hideUserInfoPopup();
+                        }
+                    };
+
+                    // 延迟添加点击外部关闭事件，避免立即触发
+                    setTimeout(() => {
+                        document.addEventListener('click', currentPopupCloseHandler);
+                    }, 100);
+
+                } catch (error) {
+                    console.error('Error updating popup content:', error);
+                }
             }
         })
         .catch(error => console.error('Error fetching user info:', error));
+}
+
+// 隐藏用户信息弹窗的函数
+function hideUserInfoPopup() {
+    const popup = document.getElementById('forumUserInfoPopup');
+    if (popup) {
+        popup.classList.remove('show');
+        popup.style.opacity = '0';
+        setTimeout(() => {
+            popup.style.display = 'none';
+            // 确保弹窗回到 body 下
+            if (popup.parentElement !== document.body) {
+                document.body.appendChild(popup);
+            }
+        }, 300);
+    }
+
+    // 移除外部点击事件监听器
+    if (currentPopupCloseHandler) {
+        document.removeEventListener('click', currentPopupCloseHandler);
+        currentPopupCloseHandler = null;
+    }
+}
+
+// 加载用户的帖子列表
+function loadUserPosts(userId) {
+    fetch(`/forum/api/user/${userId}/posts`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const postsContainer = document.getElementById('forumPopupPosts');
+                postsContainer.innerHTML = '';
+
+                if (data.posts.length === 0) {
+                    postsContainer.innerHTML = '<div class="no-posts">暂无发帖</div>';
+                    return;
+                }
+
+                data.posts.forEach(post => {
+                    const postElement = document.createElement('div');
+                    postElement.className = 'user-post-item';
+                    postElement.innerHTML = `
+                        <div class="user-post-title">${post.title}</div>
+                        <div class="user-post-meta">
+                            <span class="user-post-time">${formatDate(post.created_at)}</span>
+                            <span class="user-post-comments">
+                                <i class="fas fa-comment"></i>
+                                ${post.comment_count}
+                            </span>
+                        </div>
+                    `;
+
+                    // 添加点击事件，打开帖子详情
+                    postElement.addEventListener('click', () => {
+                        openPostDetail(post.id);
+                    });
+
+                    postsContainer.appendChild(postElement);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading user posts:', error));
 }
 
 // 生成随机颜色
@@ -158,9 +344,11 @@ function createPostCard(post) {
     // 添加用户信息弹窗事件
     const authorElement = div.querySelector('.post-author');
     authorElement.addEventListener('click', function (e) {
-        e.stopPropagation();
+        e.stopPropagation();  // 阻止事件冒泡
         const userId = this.dataset.userId;
-        showUserInfo(userId);
+        if (userId) {
+            showUserInfo(userId, e);
+        }
     });
 
     // 添加帖子点击事件
@@ -175,6 +363,8 @@ function createPostCard(post) {
 
 // 初始化论坛功能
 function initializeForum() {
+    console.log('Initializing forum...');
+
     // 加载初始帖子列表
     loadPosts(1);
 
@@ -207,12 +397,46 @@ function initializeForum() {
             document.body.classList.add('modal-open');
         });
     }
+
+    // 初始化用户信息弹窗
+    initializeUserInfoPopup();
+}
+
+// 初始化用户信息弹窗
+function initializeUserInfoPopup() {
+    console.log('Initializing user info popup...');
+    const popup = document.getElementById('forumUserInfoPopup');
+
+    if (!popup) {
+        console.error('User info popup element not found!');
+        return;
+    }
+
+    // 确保弹窗初始状态正确
+    popup.style.display = 'none';
+    popup.style.opacity = '0';
+    popup.classList.remove('show');
+
+    // 移除可能存在的旧事件监听器
+    if (currentPopupCloseHandler) {
+        document.removeEventListener('click', currentPopupCloseHandler);
+        currentPopupCloseHandler = null;
+    }
+
+    // 初始化关闭按钮
+    const closeBtn = popup.querySelector('.close-popup');
+    if (closeBtn) {
+        closeBtn.onclick = function (e) {
+            e.stopPropagation();
+            hideUserInfoPopup();
+        };
+    }
 }
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function () {
+    console.log('DOM loaded, initializing...');
     initializeForum();
-    initializeUserInfoPopup();
 });
 
 // 创建分页控件
@@ -272,7 +496,9 @@ function createCommentElement(comment) {
     authorElement.addEventListener('click', function (e) {
         e.stopPropagation();
         const userId = this.dataset.userId;
-        showUserInfo(userId);
+        if (userId) {
+            showUserInfo(userId, e);
+        }
     });
 
     return div;
@@ -332,7 +558,9 @@ function openPostDetail(postId) {
             newAuthorInfo.addEventListener('click', function (e) {
                 e.stopPropagation();
                 const userId = this.dataset.userId;
-                showUserInfo(userId);
+                if (userId) {
+                    showUserInfo(userId, e);
+                }
             });
 
             loadComments(postId);
@@ -495,32 +723,4 @@ function handleOutsideModalClick(e) {
             document.getElementById('newPostForm').reset();
         }
     }
-}
-
-// 初始化用户信息弹窗
-function initializeUserInfoPopup() {
-    const userInfoPopup = document.getElementById('forumUserInfoPopup');
-    if (!userInfoPopup) return;
-
-    // 设置默认头像颜色
-    document.querySelectorAll('.default-avatar').forEach(avatar => {
-        const username = avatar.textContent.trim();
-        if (username) {
-            avatar.style.setProperty('--avatar-color', getRandomColor(username));
-        }
-    });
-
-    // 处理弹窗的点击事件
-    document.addEventListener('click', (e) => {
-        const authorElement = e.target.closest('.post-author');
-        if (authorElement) {
-            e.stopPropagation();
-            const userId = authorElement.dataset.userId;
-            if (userId) {
-                showUserInfo(userId);
-            }
-        } else if (!userInfoPopup.contains(e.target)) {
-            userInfoPopup.classList.remove('show');
-        }
-    });
 } 
