@@ -390,3 +390,34 @@ def get_user_info(user_id):
             'success': False,
             'error': '获取用户信息失败'
         }), 500 
+
+@forum_bp.route('/api/user/<int:user_id>/posts', methods=['GET'])
+@login_required
+def get_user_posts(user_id):
+    """获取用户的帖子列表"""
+    try:
+        # 获取用户的帖子并包含评论数
+        posts = db.session.query(Post, User)\
+            .join(User, Post.user_id == User.id)\
+            .filter(Post.user_id == user_id)\
+            .order_by(Post.created_at.desc())\
+            .all()
+        
+        posts_data = [{
+            'id': post.Post.id,
+            'title': post.Post.title,
+            'content': post.Post.content,
+            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'comment_count': Comment.query.filter_by(post_id=post.Post.id).count()
+        } for post in posts]
+        
+        return jsonify({
+            'success': True,
+            'posts': posts_data
+        })
+    except Exception as e:
+        logging.error(f"获取用户帖子列表时出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '获取用户帖子列表失败'
+        }), 500 
