@@ -9,74 +9,96 @@
 {% block content %}
 <div class="forum-container">
     <div class="forum-header">
-        <h1>掲示板</h1>
-        <button id="newPostBtn" class="btn btn-primary">新規投稿</button>
+        <div class="tag-filter-container">
+            <!-- タグはJavaScriptで動的に読み込まれます -->
+        </div>
+        <button id="newPostBtn" class="btn-primary" onclick="document.getElementById('newPostModal').style.display='block'">
+            <i class="fas fa-plus"></i> 新しい投稿
+        </button>
     </div>
     
     <div class="posts-container">
-        <!-- 帖子列表将通过JavaScript动态加载 -->
+        <!-- 投稿リストはJavaScriptで動的に読み込まれます -->
     </div>
     
     <div class="pagination">
-        <!-- 分页控件将通过JavaScript动态加载 -->
+        <!-- ページネーションはJavaScriptで動的に読み込まれます -->
     </div>
 </div>
 
-<!-- 新建帖子的模态框 -->
+<!-- 新規投稿モーダル -->
 <div id="newPostModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2>新規投稿</h2>
-            <button type="button" class="close">&times;</button>
+            <h2>新しい投稿を作成</h2>
+            <span class="close">&times;</span>
         </div>
         <div class="modal-body">
             <form id="newPostForm">
                 <div class="form-group">
-                    <label for="postTitle">タイトル</label>
-                    <input type="text" id="postTitle" name="title" required>
+                    <label for="title">タイトル</label>
+                    <input type="text" name="title" id="title" required>
                 </div>
                 <div class="form-group">
-                    <label for="postContent">内容</label>
-                    <textarea id="postContent" name="content" required></textarea>
+                    <label for="tag">タグ</label>
+                    <div class="tag-input-container">
+                        <select name="tag" id="tag" class="tag-select">
+                            <option value="">タグを選択</option>
+                            <!-- タグリストはJavaScriptで動的に読み込まれます -->
+                        </select>
+                        <input type="text" id="newTag" placeholder="新しいタグを入力" class="new-tag-input">
+                        <button type="button" id="addTagBtn" class="btn-secondary">追加</button>
+                    </div>
+                    <div id="selectedTags" class="selected-tags">
+                        <!-- 選択されたタグはJavaScriptで動的に表示されます -->
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="content">内容</label>
+                    <textarea name="content" id="content" required></textarea>
+                    <div class="hint">@momoを入力すると、AIアシスタントが返信します</div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary close-modal">キャンセル</button>
-                    <button type="submit" class="btn btn-primary">投稿</button>
+                    <button type="button" class="btn-secondary close-modal">キャンセル</button>
+                    <button type="submit" class="btn-primary">投稿</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- 帖子详情的模态框 -->
+<!-- 投稿詳細モーダル -->
 <div id="postDetailModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2>投稿の詳細</h2>
-            <button type="button" class="close">&times;</button>
+            <h2>投稿詳細</h2>
+            <span class="close">&times;</span>
         </div>
         <div class="modal-body">
             <div class="post-detail">
                 <div class="post-detail-header">
                     <div class="post-author-info">
-                        <div id="postDetailAvatar" class="post-avatar">
-                            <img id="postDetailAvatarImg" src="" alt="" style="display: none;">
+                        <div class="post-avatar" id="postDetailAvatar">
+                            <img id="postDetailAvatarImg" src="" alt="">
                             <div id="postDetailAvatarInitial" class="default-avatar"></div>
                         </div>
                         <div class="post-info">
                             <span id="postAuthor"></span>
-                            <span id="postTime" class="post-time"></span>
+                            <span id="postTime"></span>
                         </div>
                     </div>
                 </div>
-                <h1 id="postTitle"></h1>
-                <div id="postContent" class="post-detail-content"></div>
+                <h3 id="postTitle"></h3>
+                <div id="postTags" class="post-tags">
+                    <!-- タグはJavaScriptで動的に表示されます -->
+                </div>
+                <div class="post-detail-content" id="postContent"></div>
             </div>
             
             <div class="comments-section">
                 <h3>コメント</h3>
                 <div id="commentsContainer" class="comments-container">
-                    <!-- 评论将通过JavaScript动态加载 -->
+                    <!-- コメントはJavaScriptで動的に読み込まれます -->
                 </div>
                 <form id="newCommentForm" class="comment-form">
                     <div class="form-group">
@@ -92,7 +114,7 @@
     </div>
 </div>
 
-<!-- 用户信息弹窗 -->
+<!-- ユーザー情報ポップアップ -->
 <div class="user-info-popup" id="forumUserInfoPopup">
     <div class="popup-header">
         <div class="popup-avatar">
@@ -107,34 +129,34 @@
     </div>
     <div class="info-grid">
         <div class="info-item">
-            <span class="info-label">読書スコア</span>
-            <span id="forumPopupReadingScore" class="info-value">-</span>
+            <span class="info-label">投稿</span>
+            <span id="forumPopupPostCount" class="info-value">0</span>
         </div>
         <div class="info-item">
-            <span class="info-label">投稿数</span>
-            <span id="forumPopupPostCount" class="info-value">-</span>
+            <span class="info-label">コメント</span>
+            <span id="forumPopupCommentCount" class="info-value">0</span>
         </div>
         <div class="info-item">
-            <span class="info-label">コメント数</span>
-            <span id="forumPopupCommentCount" class="info-value">-</span>
-        </div>
-        <div class="info-item">
-            <span class="info-label">練習回数</span>
-            <span id="forumPopupTotalPractices" class="info-value">-</span>
+            <span class="info-label">練習</span>
+            <span id="forumPopupTotalPractices" class="info-value">0</span>
         </div>
         <div class="info-item">
             <span class="info-label">学習時間</span>
-            <span id="forumPopupTotalStudyTime" class="info-value">-</span>
+            <span id="forumPopupTotalStudyTime" class="info-value">0分</span>
         </div>
         <div class="info-item">
             <span class="info-label">連続学習</span>
-            <span id="forumPopupStreakDays" class="info-value">-</span>
+            <span id="forumPopupStreakDays" class="info-value">0日</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">平均点</span>
+            <span id="forumPopupReadingScore" class="info-value">0.0</span>
         </div>
     </div>
     <div class="user-posts">
-        <h4 class="user-posts-header">投稿履歴</h4>
+        <div class="user-posts-header">投稿履歴</div>
         <div id="forumPopupPosts" class="user-posts-list">
-            <!-- 帖子将通过 JavaScript 动态加载 -->
+            <!-- 投稿はJavaScriptで動的に読み込まれます -->
         </div>
     </div>
 </div>
