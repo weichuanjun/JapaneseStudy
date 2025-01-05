@@ -55,3 +55,12 @@ temp_*
 # Azure 凭证
 *.key
 subscription_key.txt
+
+# 数据库迁移
+migrations/
+
+# 备份文件
+*backup*
+*bak
+*.bak
+*.backup

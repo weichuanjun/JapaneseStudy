@@ -169,6 +169,20 @@ class Vocabulary(db.Model):
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
         } 
 
+class Tag(db.Model):
+    __tablename__ = 'tags'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    color = db.Column(db.String(7), nullable=False)  # 存储HEX颜色代码
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+# 帖子和标签的多对多关系表
+post_tags = db.Table('post_tags',
+    db.Column('post_id', db.Integer, db.ForeignKey('posts.id'), primary_key=True),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True)
+)
+
 class Post(db.Model):
     __tablename__ = 'posts'
     
@@ -181,6 +195,8 @@ class Post(db.Model):
     # 添加关系
     user = db.relationship('User', backref=db.backref('posts', lazy=True))
     comments = db.relationship('Comment', backref='post', lazy=True, cascade='all, delete-orphan')
+    tags = db.relationship('Tag', secondary=post_tags, lazy='subquery',
+        backref=db.backref('posts', lazy=True))
 
     @property
     def serialize(self):
@@ -189,8 +205,10 @@ class Post(db.Model):
             'title': self.title,
             'content': self.content,
             'author_name': self.user.username,
+            'author_id': self.user_id,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'comment_count': len(self.comments)
+            'comment_count': len(self.comments),
+            'tags': [{'id': tag.id, 'name': tag.name, 'color': tag.color} for tag in self.tags]
         }
 
 class Comment(db.Model):
