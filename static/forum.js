@@ -2,6 +2,7 @@
 let currentPage = 1;
 let currentPostId = null;
 let currentPopupCloseHandler = null;  // 添加全局变量来跟踪当前的点击外部关闭处理器
+let postDetailUpdateInterval = null;  // 添加更新计时器变量
 
 // 统一的用户信息显示函数
 function showUserInfo(userId, clickEvent) {
@@ -511,7 +512,21 @@ function openPostDetail(postId) {
     modal.style.display = 'block';
     document.body.classList.add('modal-open');
 
-    fetch(`/forum/api/posts/${postId}`)
+    // 加载帖子详情
+    loadPostDetail();
+
+    // 设置定期更新
+    if (postDetailUpdateInterval) {
+        clearInterval(postDetailUpdateInterval);
+    }
+    postDetailUpdateInterval = setInterval(loadPostDetail, 3000); // 每5秒更新一次
+}
+
+// 加载帖子详情
+function loadPostDetail() {
+    if (!currentPostId) return;
+
+    fetch(`/forum/api/posts/${currentPostId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('加载帖子详情失败');
@@ -563,7 +578,8 @@ function openPostDetail(postId) {
                 }
             });
 
-            loadComments(postId);
+            // 更新评论
+            loadComments(currentPostId);
         })
         .catch(error => {
             console.error('加载帖子详情失败:', error);
@@ -694,11 +710,18 @@ function handleNewCommentSubmit(e) {
 
 // 处理模态框关闭
 function handleModalClose(e) {
-    e.preventDefault();  // 防止按钮提交表单
+    e.preventDefault();
     const modal = this.closest('.modal');
     if (modal) {
         modal.style.display = 'none';
         document.body.classList.remove('modal-open');
+
+        // 清除更新计时器
+        if (postDetailUpdateInterval) {
+            clearInterval(postDetailUpdateInterval);
+            postDetailUpdateInterval = null;
+        }
+
         // 如果是帖子详情模态框，重置状态
         if (modal.id === 'postDetailModal') {
             currentPostId = null;
@@ -715,6 +738,13 @@ function handleOutsideModalClick(e) {
     if (e.target.classList.contains('modal')) {
         e.target.style.display = 'none';
         document.body.classList.remove('modal-open');
+
+        // 清除更新计时器
+        if (postDetailUpdateInterval) {
+            clearInterval(postDetailUpdateInterval);
+            postDetailUpdateInterval = null;
+        }
+
         if (e.target.id === 'postDetailModal') {
             currentPostId = null;
             document.getElementById('commentsContainer').innerHTML = '';
