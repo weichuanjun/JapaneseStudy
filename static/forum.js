@@ -7,7 +7,7 @@ let postDetailUpdateInterval = null;  // 添加更新计时器变量
 // 统一的用户信息显示函数
 function showUserInfo(userId, clickEvent) {
     if (!userId) {
-        console.error('No userId provided');
+        console.error('ユーザーIDが指定されていません');
         return;
     }
 
