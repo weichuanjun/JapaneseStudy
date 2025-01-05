@@ -3,6 +3,58 @@ let currentPage = 1;
 let currentPostId = null;
 let currentPopupCloseHandler = null;  // 添加全局变量来跟踪当前的点击外部关闭处理器
 let postDetailUpdateInterval = null;  // 添加更新计时器变量
+let selectedTags = new Set();  // 用于存储选中的标签
+let currentFilterTag = null;   // 用于存储当前筛选的标签
+
+// 生成随机柔和的颜色
+function generatePastelColor() {
+    const hue = Math.floor(Math.random() * 360);
+    return `hsl(${hue}, 70%, 80%)`;
+}
+
+// 加载标签列表
+function loadTags() {
+    fetch('/forum/api/tags')
+        .then(response => response.json())
+        .then(tags => {
+            // 更新标签筛选器
+            const filterContainer = document.querySelector('.tag-filter-container');
+            filterContainer.innerHTML = '';
+            tags.forEach(tag => {
+                const tagElement = document.createElement('span');
+                tagElement.className = 'tag';
+                tagElement.textContent = `#${tag.name}`;
+                tagElement.style.backgroundColor = tag.color;
+                tagElement.dataset.tagId = tag.id;
+                tagElement.onclick = () => filterByTag(tag.id);
+                filterContainer.appendChild(tagElement);
+            });
+
+            // 更新新建帖子表单的标签列表
+            const tagList = document.getElementById('tagList');
+            tagList.innerHTML = '';
+            tags.forEach(tag => {
+                const option = document.createElement('option');
+                option.value = tag.name;
+                tagList.appendChild(option);
+            });
+        })
+        .catch(error => console.error('タグの読み込みに失敗しました:', error));
+}
+
+// 根据标签筛选帖子
+function filterByTag(tagId) {
+    currentFilterTag = currentFilterTag === tagId ? null : tagId;
+    const tags = document.querySelectorAll('.tag');
+    tags.forEach(tag => {
+        if (tag.dataset.tagId === String(tagId)) {
+            tag.classList.toggle('active');
+        } else {
+            tag.classList.remove('active');
+        }
+    });
+    loadPosts(1);
+}
 
 // 统一的用户信息显示函数
 function showUserInfo(userId, clickEvent) {
@@ -297,7 +349,12 @@ function loadPosts(page = 1) {
     const postsContainer = document.querySelector('.posts-container');
     const paginationContainer = document.querySelector('.pagination');
 
-    fetch(`/forum/api/posts?page=${page}&per_page=20`)
+    let url = `/forum/api/posts?page=${page}&per_page=20`;
+    if (currentFilterTag) {
+        url += `&tag_id=${currentFilterTag}`;
+    }
+
+    fetch(url)
         .then(response => response.json())
         .then(data => {
             postsContainer.innerHTML = '';
@@ -307,7 +364,7 @@ function loadPosts(page = 1) {
             });
             createPagination(data.total, data.pages, data.current_page, paginationContainer);
         })
-        .catch(error => console.error('加载帖子失败:', error));
+        .catch(error => console.error('投稿の読み込みに失敗しました:', error));
 }
 
 // 创建帖子卡片
@@ -322,6 +379,10 @@ function createPostCard(post) {
         const initial = post.author_name ? post.author_name.charAt(0).toUpperCase() : '?';
         avatarHtml = initial;
     }
+
+    const tagsHtml = post.tags.map(tag =>
+        `<span class="tag" style="background-color: ${tag.color}">#${tag.name}</span>`
+    ).join('');
 
     div.innerHTML = `
         <div class="post-header">
@@ -338,6 +399,7 @@ function createPostCard(post) {
             <div class="post-content">${post.content}</div>
             <div class="post-footer">
                 <span class="post-comments">${post.comment_count} 件の返信</span>
+                <div class="post-tags">${tagsHtml}</div>
             </div>
         </div>
     `;
@@ -437,6 +499,7 @@ function initializeUserInfoPopup() {
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function () {
     console.log('DOM loaded, initializing...');
+    loadTags();  // 加载标签列表
     initializeForum();
 });
 
@@ -545,6 +608,12 @@ function loadPostDetail() {
             document.getElementById('postAuthor').textContent = post.author_name;
             document.getElementById('postTime').textContent = formatDate(post.created_at);
 
+            // 更新标签
+            const tagsContainer = document.getElementById('postTags');
+            tagsContainer.innerHTML = post.tags.map(tag =>
+                `<span class="tag" style="background-color: ${tag.color}">#${tag.name}</span>`
+            ).join('');
+
             // 更新头像
             const avatarImg = document.getElementById('postDetailAvatarImg');
             const avatarInitial = document.getElementById('postDetailAvatarInitial');
@@ -633,7 +702,11 @@ function handleNewPostSubmit(e) {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ title, content })
+        body: JSON.stringify({
+            title,
+            content,
+            tag_ids: Array.from(selectedTags)
+        })
     })
         .then(response => {
             if (!response.ok) {
@@ -649,8 +722,10 @@ function handleNewPostSubmit(e) {
             // 关闭模态框
             const modal = document.getElementById('newPostModal');
             modal.style.display = 'none';
-            // 重置表单
+            // 重置表单和选中的标签
             this.reset();
+            selectedTags.clear();
+            document.getElementById('selectedTags').innerHTML = '';
             // 刷新帖子列表
             loadPosts(1);
         })
@@ -755,4 +830,50 @@ function handleOutsideModalClick(e) {
             document.getElementById('newPostForm').reset();
         }
     }
-} 
+}
+
+// 处理添加标签按钮点击
+document.getElementById('addTagBtn').addEventListener('click', function () {
+    const tagInput = document.getElementById('tag');
+    const tagName = tagInput.value.trim();
+
+    if (!tagName) return;
+
+    // 检查是否已存在该标签
+    fetch('/forum/api/tags', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: tagName })
+    })
+        .then(response => response.json())
+        .then(tag => {
+            // 添加到已选标签
+            const selectedTagsContainer = document.getElementById('selectedTags');
+            const tagElement = document.createElement('span');
+            tagElement.className = 'selected-tag';
+            tagElement.style.backgroundColor = tag.color;
+            tagElement.innerHTML = `
+            #${tag.name}
+            <span class="remove-tag" data-tag-id="${tag.id}">&times;</span>
+        `;
+            selectedTagsContainer.appendChild(tagElement);
+
+            // 清空输入框
+            tagInput.value = '';
+
+            // 将标签ID添加到选中集合
+            selectedTags.add(tag.id);
+        })
+        .catch(error => console.error('タグの追加に失敗しました:', error));
+});
+
+// 处理移除标签
+document.getElementById('selectedTags').addEventListener('click', function (e) {
+    if (e.target.classList.contains('remove-tag')) {
+        const tagId = e.target.dataset.tagId;
+        selectedTags.delete(Number(tagId));
+        e.target.parentElement.remove();
+    }
+}); 
