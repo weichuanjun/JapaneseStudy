@@ -184,12 +184,18 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
+@app.route('/index')
+@login_required
+def index_redirect():
+    return redirect(url_for('index', active_tab=request.args.get('active_tab', 'dashboard')))
+
 @app.route('/')
 @login_required
 def index():
     active_tab = request.args.get('active_tab', 'dashboard')
     current_user = User.query.get(session['user_id'])
     return render_template('index.html', active_tab=active_tab, current_user=current_user)
+
 # 保存阅读练习记录
 def save_reading_record(user_id, content, scores, difficulty='medium'):
     user = User.query.get(user_id)
