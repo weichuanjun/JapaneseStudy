@@ -423,14 +423,80 @@ function updateLeaderboard(data, elementId) {
     bindUserPopupEvents();
 }
 
-// 刷新dashboard数据
-function refreshDashboard() {
-    if (document.getElementById('dashboardTab').classList.contains('active')) {
-        loadReadingRecords();
-        loadTopicRecords();
-        loadLeaderboards();
+// 加载问候语
+async function loadGreeting() {
+    try {
+        const response = await fetch('/api/dashboard/greeting');
+        const data = await response.json();
+        const greetingElement = document.getElementById('userGreeting');
+        if (greetingElement) {
+            greetingElement.textContent = data.greeting;
+        }
+    } catch (error) {
+        console.error('Error loading greeting:', error);
     }
 }
+
+// 加载学习建议
+async function loadLearningAdvice() {
+    const adviceElement = document.getElementById('learningAdvice');
+    const loadButton = document.getElementById('loadAdviceBtn');
+    if (!adviceElement || !loadButton) return;
+
+    // 禁用按钮并显示加载状态
+    loadButton.disabled = true;
+    loadButton.textContent = 'アドバイスを生成中...';
+    adviceElement.innerHTML = '<div class="loading">アドバイスを生成中...</div>';
+
+    try {
+        const response = await fetch('/api/dashboard/advice');
+        const data = await response.json();
+
+        if (data.success) {
+            // 配置marked选项
+            marked.setOptions({
+                gfm: true,
+                breaks: true,
+                smartLists: true,
+                smartypants: true
+            });
+
+            // 使用marked库渲染Markdown
+            const formattedAdvice = marked.parse(data.advice);
+            adviceElement.innerHTML = formattedAdvice;
+        } else {
+            adviceElement.innerHTML = `<div class="error">${data.error || 'アドバイスの生成に失敗しました'}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading advice:', error);
+        adviceElement.innerHTML = '<div class="error">アドバイスの生成に失敗しました。<br>しばらくしてからもう一度お試しください。</div>';
+    } finally {
+        // 恢复按钮状态
+        loadButton.disabled = false;
+        loadButton.textContent = 'アドバイスを生成';
+    }
+}
+
+// 修改refreshDashboard函数
+async function refreshDashboard() {
+    await Promise.all([
+        loadGreeting(),
+        loadReadingRecords(),
+        loadTopicRecords(),
+        loadLeaderboards()
+    ]);
+}
+
+// 添加开始加载按钮的事件监听器
+document.addEventListener('DOMContentLoaded', function () {
+    const loadAdviceBtn = document.getElementById('loadAdviceBtn');
+    if (loadAdviceBtn) {
+        loadAdviceBtn.addEventListener('click', loadLearningAdvice);
+    }
+
+    // 自动加载问候语
+    loadGreeting();
+});
 
 // 初始化dashboard
 document.addEventListener('DOMContentLoaded', () => {
