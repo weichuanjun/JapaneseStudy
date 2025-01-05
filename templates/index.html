@@ -5,6 +5,7 @@
 {% block extra_css %}
 <script src='https://kit.fontawesome.com/a076d05399.js'></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
     .tab-content {
         display: none;
@@ -523,6 +524,157 @@
         object-fit: cover;
         border-radius: 50%;
     }
+
+    /* 问候语样式 */
+    .greeting-section {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .greeting-text {
+        font-size: 1.4em;
+        font-weight: bold;
+        color: #333;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* 学习建议样式 */
+    .advice-section {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .advice-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .advice-title {
+        font-size: 1.2em;
+        color: #333;
+    }
+    
+    .advice-content {
+        line-height: 1.4;
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+    }
+    
+    .load-button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    
+    .load-button:hover {
+        background-color: #45a049;
+    }
+    
+    .load-button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+    }
+
+    /* Markdown 内容样式 */
+    .markdown-content {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        line-height: 1.4;
+        color: #333;
+        padding: 15px 0;
+    }
+    
+    .markdown-content h1 {
+        font-size: 1.4em;
+        margin: 16px 0 8px 0;
+        padding: 0;
+        font-weight: 600;
+        color: #24292e;
+    }
+    
+    .markdown-content strong {
+        font-weight: 600;
+        color: #24292e;
+    }
+    
+    .markdown-content ul {
+        padding-left: 1.5em;
+        margin: 4px 0;
+    }
+    
+    .markdown-content li {
+        margin: 4px 0;
+    }
+    
+    .markdown-content p {
+        margin: 8px 0;
+    }
+    
+    /* 调整建议内容的间距 */
+    .advice-content {
+        line-height: 1.4;
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+    }
+    
+    /* 调整建议内容中的列表样式 */
+    .markdown-content ul li {
+        position: relative;
+        padding-left: 0.2em;
+    }
+    
+    .markdown-content ul li:before {
+        content: "•";
+        position: absolute;
+        left: -0.8em;
+        color: #666;
+    }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .load-button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        margin-left: auto;
+    }
+    
+    .load-button:hover {
+        background-color: #45a049;
+    }
+    
+    .load-button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+    }
+
+    /* Markdown 内容样式 */
 </style>
 {% endblock %}
 
@@ -530,6 +682,20 @@
 <!-- Dashboard Tab -->
 <div id="dashboardTab" class="tab-content {% if active_tab == 'dashboard' %}active{% endif %}">
     <div class="dashboard-container">
+        <!-- 问候语部分 -->
+        <div id="userGreeting" class="greeting-text" style="margin-bottom: 20px;"></div>
+        
+        <!-- 学习建议部分 -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <h3 class="chart-title">学習アドバイス</h3>
+                <button id="loadAdviceBtn" class="load-button">
+                    アドバイスを生成
+                </button>
+            </div>
+            <div id="learningAdvice" class="markdown-content"></div>
+        </div>
+        
         <!-- 文章を読む Chart Section -->
         <div class="chart-section">
             <div class="chart-header">
