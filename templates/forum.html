@@ -42,10 +42,11 @@
                 <div class="form-group">
                     <label for="tag">タグ</label>
                     <div class="tag-input-container">
-                        <input type="text" name="tag" id="tag" list="tagList" placeholder="タグを入力または選択">
-                        <datalist id="tagList">
+                        <select name="tag" id="tag" class="tag-select">
+                            <option value="">タグを選択</option>
                             <!-- タグリストはJavaScriptで動的に読み込まれます -->
-                        </datalist>
+                        </select>
+                        <input type="text" id="newTag" placeholder="新しいタグを入力" class="new-tag-input">
                         <button type="button" id="addTagBtn" class="btn-secondary">追加</button>
                     </div>
                     <div id="selectedTags" class="selected-tags">
