@@ -10,7 +10,7 @@
 <div class="forum-container">
     <div class="forum-header">
         <h1>掲示板</h1>
-        <button id="newPostBtn" class="btn-primary" onclick="document.getElementById('newPostModal').style.display='block'">
+        <button id="newPostBtn" class="btn btn-primary" onclick="document.getElementById('newPostModal').style.display='block'">
             <i class="fas fa-plus"></i> 新しい投稿
         </button>
     </div>
@@ -29,7 +29,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h2>新しい投稿を作成</h2>
-            <span class="close">&times;</span>
+            <button class="close">&times;</button>
         </div>
         <div class="modal-body">
             <form id="newPostForm">
@@ -43,8 +43,8 @@
                     <div class="hint">@momoを入力すると、AIアシスタントが返信します</div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary close-modal">キャンセル</button>
-                    <button type="submit" class="btn-primary">投稿</button>
+                    <button type="button" class="btn btn-secondary close-modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">投稿</button>
                 </div>
             </form>
         </div>
@@ -56,24 +56,24 @@
     <div class="modal-content">
         <div class="modal-header">
             <h2>投稿詳細</h2>
-            <span class="close">&times;</span>
+            <button class="close">&times;</button>
         </div>
         <div class="modal-body">
             <div class="post-detail">
                 <div class="post-detail-header">
                     <div class="post-author-info">
                         <div class="post-avatar" id="postDetailAvatar">
-                            <img id="postDetailAvatarImg" src="" alt="">
+                            <img id="postDetailAvatarImg" src="" alt="" style="display: none;">
                             <div id="postDetailAvatarInitial" class="default-avatar"></div>
                         </div>
                         <div class="post-info">
-                            <span id="postAuthor"></span>
-                            <span id="postTime"></span>
+                            <span id="postAuthor" class="author-name"></span>
+                            <span id="postTime" class="post-time"></span>
                         </div>
                     </div>
                 </div>
-                <h3 id="postTitle"></h3>
-                <div class="post-detail-content" id="postContent"></div>
+                <h3 id="postTitle" class="post-title"></h3>
+                <div id="postContent" class="post-detail-content"></div>
             </div>
             
             <div class="comments-section">
@@ -87,7 +87,7 @@
                         <div class="hint">@momoを入力すると、AIアシスタントが返信します</div>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn-primary">コメントを投稿</button>
+                        <button type="submit" class="btn btn-primary">コメントを投稿</button>
                     </div>
                 </form>
             </div>
@@ -97,45 +97,45 @@
 
 <!-- 用户信息弹窗 -->
 <div class="user-info-popup" id="forumUserInfoPopup">
-    <div class="popup-header">
-        <div class="popup-avatar">
-            <img id="forumPopupUserAvatar" src="" alt="">
+    <div class="user-info-header">
+        <div class="user-info-avatar">
+            <img id="forumPopupUserAvatar" src="" alt="" style="display: none;">
             <div id="forumPopupUserInitial" class="default-avatar"></div>
         </div>
-        <div class="popup-info">
-            <h3 id="forumPopupUsername"></h3>
-            <small id="forumPopupJoinDate"></small>
+        <div class="user-info-details">
+            <div class="user-info-name" id="forumPopupUsername"></div>
+            <div class="user-info-join-date" id="forumPopupJoinDate"></div>
         </div>
     </div>
-    <div class="info-grid">
-        <div class="info-item">
-            <span class="info-label">发帖</span>
-            <span id="forumPopupPostCount" class="info-value">0</span>
+    <div class="user-info-grid">
+        <div class="user-info-item">
+            <div class="user-info-value" id="forumPopupReadingScore">0.0</div>
+            <div class="user-info-label">阅读平均分</div>
         </div>
-        <div class="info-item">
-            <span class="info-label">评论</span>
-            <span id="forumPopupCommentCount" class="info-value">0</span>
+        <div class="user-info-item">
+            <div class="user-info-value" id="forumPopupTopicScore">0.0</div>
+            <div class="user-info-label">会话平均分</div>
         </div>
-        <div class="info-item">
-            <span class="info-label">练习</span>
-            <span id="forumPopupTotalPractices" class="info-value">0</span>
+        <div class="user-info-item">
+            <div class="user-info-value" id="forumPopupBirthday">-</div>
+            <div class="user-info-label">生日</div>
         </div>
-        <div class="info-item">
-            <span class="info-label">学习时间</span>
-            <span id="forumPopupTotalStudyTime" class="info-value">0分</span>
+        <div class="user-info-item">
+            <div class="user-info-value" id="forumPopupMBTI">-</div>
+            <div class="user-info-label">MBTI</div>
         </div>
-        <div class="info-item">
-            <span class="info-label">连续学习</span>
-            <span id="forumPopupStreakDays" class="info-value">0日</span>
+        <div class="user-info-item">
+            <div class="user-info-value" id="forumPopupPostCount">0</div>
+            <div class="user-info-label">发帖数</div>
         </div>
-        <div class="info-item">
-            <span class="info-label">平均分</span>
-            <span id="forumPopupReadingScore" class="info-value">0.0</span>
+        <div class="user-info-item">
+            <div class="user-info-value" id="forumPopupCommentCount">0</div>
+            <div class="user-info-label">评论数</div>
         </div>
     </div>
-    <div class="bio">
-        <div class="bio-label">自己紹介</div>
-        <div id="forumPopupBio" class="bio-content">-</div>
+    <div class="user-info-bio">
+        <div class="user-info-label">自己紹介</div>
+        <div id="forumPopupBio"></div>
     </div>
 </div>
 

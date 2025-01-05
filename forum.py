@@ -360,12 +360,13 @@ def get_user_info(user_id):
     try:
         user = User.query.get_or_404(user_id)
         
-        # 计算平均分数
-        reading_scores = [score for score in user.reading_scores if score is not None]
-        topic_scores = [score for score in user.topic_scores if score is not None]
+        # 获取用户的帖子和评论数量
+        post_count = Post.query.filter_by(user_id=user_id).count()
+        comment_count = Comment.query.filter_by(user_id=user_id).count()
         
-        avg_reading_score = sum(reading_scores) / len(reading_scores) if reading_scores else 0
-        avg_topic_score = sum(topic_scores) / len(topic_scores) if topic_scores else 0
+        # 获取用户的平均分数
+        avg_reading_score = user.avg_reading_score
+        avg_topic_score = user.avg_topic_score
         
         return jsonify({
             'success': True,
@@ -374,18 +375,18 @@ def get_user_info(user_id):
                 'username': user.username,
                 'avatar_data': user.avatar_data if user.avatar_data else None,
                 'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'avg_reading_score': avg_reading_score,
-                'avg_topic_score': avg_topic_score,
-                'total_practices': user.total_practices,
-                'total_study_time': user.total_study_time,
-                'streak_days': user.streak_days,
-                'last_practice': user.last_practice.strftime('%Y-%m-%d %H:%M:%S') if user.last_practice else None,
-                'birthday': user.birthday,
-                'zodiac_sign': user.zodiac_sign,
-                'mbti': user.mbti,
-                'bio': user.bio
+                'post_count': post_count,
+                'comment_count': comment_count,
+                'avg_reading_score': round(float(avg_reading_score), 1) if avg_reading_score else 0,
+                'avg_topic_score': round(float(avg_topic_score), 1) if avg_topic_score else 0,
+                'birthday': user.birthday.strftime('%Y-%m-%d') if user.birthday else None,
+                'mbti': user.mbti if hasattr(user, 'mbti') else None,
+                'bio': user.bio if hasattr(user, 'bio') else None
             }
         })
     except Exception as e:
         logging.error(f"获取用户信息时出错: {str(e)}")
-        return jsonify({'success': False, 'error': '获取用户信息失败'}), 500 
+        return jsonify({
+            'success': False,
+            'error': '获取用户信息失败'
+        }), 500 
