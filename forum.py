@@ -170,13 +170,15 @@ def get_posts():
             .order_by(Post.created_at.desc())\
             .paginate(page=page, per_page=per_page, error_out=False)
         
-        # 构建响应数据，包含用户名
+        # 构建响应数据，包含用户名和头像
         posts_data = [{
             'id': post.Post.id,
             'title': post.Post.title,
             'content': post.Post.content,
+            'author_id': post.User.id,
             'author_name': post.User.username,
-            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # 格式化本地时间
+            'avatar_data': post.User.avatar_data if post.User.avatar_data else None,
+            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'comment_count': Comment.query.filter_by(post_id=post.Post.id).count()
         } for post in posts.items]
         
@@ -205,8 +207,10 @@ def get_post(post_id):
             'id': post.Post.id,
             'title': post.Post.title,
             'content': post.Post.content,
+            'author_id': post.User.id,
             'author_name': post.User.username,
-            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S')  # 格式化本地时间
+            'author_avatar_data': post.User.avatar_data if post.User.avatar_data else None,
+            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S')
         })
     except Exception as e:
         logging.error(f"获取帖子详情时出错: {str(e)}")
@@ -227,7 +231,9 @@ def get_comments(post_id):
         return jsonify([{
             'id': comment.Comment.id,
             'content': comment.Comment.content,
+            'author_id': comment.User.id,
             'author_name': comment.User.username,
+            'author_avatar_data': comment.User.avatar_data if comment.User.avatar_data else None,
             'created_at': comment.Comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
         } for comment in comments])
     except Exception as e:
@@ -254,22 +260,24 @@ def create_post():
             title=title,
             content=content,
             user_id=user_id,
-            created_at=datetime.now()  # 使用本地时间
+            created_at=datetime.now()
         )
         
         db.session.add(post)
         db.session.commit()
         
-        # 刷新 post 对象以获取完整的关系数据
-        db.session.refresh(post)
+        # 获取用户信息
+        user = User.query.get(user_id)
         
         # 准备响应数据
         response_data = {
             'id': post.id,
             'title': post.title,
             'content': post.content,
-            'author_name': User.query.get(user_id).username,
-            'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # 格式化本地时间
+            'author_id': user_id,
+            'author_name': user.username,
+            'avatar_data': user.avatar_data if user.avatar_data else None,
+            'created_at': post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             'comment_count': 0
         }
         
@@ -316,24 +324,100 @@ def create_comment(post_id):
         db.session.add(comment)
         db.session.commit()
         
+        # 获取用户信息
+        user = User.query.get(user_id)
+        
+        # 准备响应数据
+        response_data = {
+            'id': comment.id,
+            'content': comment.content,
+            'author_id': user_id,
+            'author_name': user.username,
+            'author_avatar_data': user.avatar_data if user.avatar_data else None,
+            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
         # 检查是否包含 @momo，在后台异步处理 AI 回复
         if '@momo' in content:
             thread = threading.Thread(
                 target=add_ai_response_with_app,
                 args=(current_app._get_current_object(), post_id, content),
-                daemon=True  # 设置为守护线程，这样主程序退出时线程会自动结束
+                daemon=True
             )
             thread.start()
             logging.info(f"已启动 AI 回复线程，post_id: {post_id}")
         
-        # 立即返回用户评论
-        return jsonify({
-            'id': comment.id,
-            'content': comment.content,
-            'author_name': comment.user.username,
-            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
-        })
+        return jsonify(response_data)
     except Exception as e:
         db.session.rollback()
         logging.error(f"创建评论时出错: {str(e)}")
-        return jsonify({'error': '创建评论失败'}), 500 
+        return jsonify({'error': '创建评论失败'}), 500
+
+@forum_bp.route('/api/user/<int:user_id>', methods=['GET'])
+@login_required
+def get_user_info(user_id):
+    """获取用户信息"""
+    try:
+        user = User.query.get_or_404(user_id)
+        
+        # 获取用户的帖子和评论数量
+        post_count = Post.query.filter_by(user_id=user_id).count()
+        comment_count = Comment.query.filter_by(user_id=user_id).count()
+        
+        # 获取用户的平均分数
+        avg_reading_score = user.avg_reading_score
+        avg_topic_score = user.avg_topic_score
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'avatar_data': user.avatar_data if user.avatar_data else None,
+                'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'post_count': post_count,
+                'comment_count': comment_count,
+                'avg_reading_score': round(float(avg_reading_score), 1) if avg_reading_score else 0,
+                'avg_topic_score': round(float(avg_topic_score), 1) if avg_topic_score else 0,
+                'birthday': user.birthday.strftime('%Y-%m-%d') if user.birthday else None,
+                'mbti': user.mbti if hasattr(user, 'mbti') else None,
+                'bio': user.bio if hasattr(user, 'bio') else None
+            }
+        })
+    except Exception as e:
+        logging.error(f"获取用户信息时出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '获取用户信息失败'
+        }), 500 
+
+@forum_bp.route('/api/user/<int:user_id>/posts', methods=['GET'])
+@login_required
+def get_user_posts(user_id):
+    """获取用户的帖子列表"""
+    try:
+        # 获取用户的帖子并包含评论数
+        posts = db.session.query(Post, User)\
+            .join(User, Post.user_id == User.id)\
+            .filter(Post.user_id == user_id)\
+            .order_by(Post.created_at.desc())\
+            .all()
+        
+        posts_data = [{
+            'id': post.Post.id,
+            'title': post.Post.title,
+            'content': post.Post.content,
+            'created_at': post.Post.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'comment_count': Comment.query.filter_by(post_id=post.Post.id).count()
+        } for post in posts]
+        
+        return jsonify({
+            'success': True,
+            'posts': posts_data
+        })
+    except Exception as e:
+        logging.error(f"获取用户帖子列表时出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '获取用户帖子列表失败'
+        }), 500 

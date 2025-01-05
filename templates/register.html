@@ -1,115 +1,271 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>新規登録</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        
-        .register-container {
-            background-color: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        .register-container h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 1.5rem;
-        }
-        
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #666;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 1rem;
-        }
-        
-        .submit-btn {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 1rem;
-            cursor: pointer;
-            margin-top: 1rem;
-        }
-        
-        .submit-btn:hover {
-            background-color: #45a049;
-        }
-        
-        .login-link {
-            text-align: center;
-            margin-top: 1rem;
-        }
-        
-        .login-link a {
-            color: #4CAF50;
-            text-decoration: none;
-        }
-        
-        .login-link a:hover {
-            text-decoration: underline;
-        }
-        
-        .error-message {
-            color: #f44336;
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-    </style>
-</head>
-<body>
-    <div class="register-container">
+{% extends "base.html" %}
+
+{% block title %}新規登録{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+    }
+    
+    .register-container {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 400px;
+    }
+    
+    .register-container h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #666;
+    }
+    
+    .form-group input {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    
+    .submit-btn {
+        width: 100%;
+        padding: 0.75rem;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        margin-top: 1rem;
+    }
+    
+    .submit-btn:hover {
+        background-color: #45a049;
+    }
+    
+    .login-link {
+        text-align: center;
+        margin-top: 1rem;
+    }
+    
+    .login-link a {
+        color: #4CAF50;
+        text-decoration: none;
+    }
+    
+    .login-link a:hover {
+        text-decoration: underline;
+    }
+    
+    .error-message {
+        color: #f44336;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+.avatar-preview {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background-color: var(--avatar-color, #45a049);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 72px;
+    font-weight: 500;
+    text-transform: uppercase;
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+}
+
+.default-avatar {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
         <h1>新規登録</h1>
-        {% if error %}
-        <div class="error-message">{{ error }}</div>
-        {% endif %}
-        <form method="POST" action="{{ url_for('register') }}">
-            <div class="form-group">
+    </div>
+
+    <div class="profile-content">
+        <form method="POST" class="profile-form" enctype="multipart/form-data">
+            {% if error %}
+            <div class="error-message">{{ error }}</div>
+            {% endif %}
+
+            <div class="form-group required">
                 <label for="username">ユーザー名</label>
                 <input type="text" id="username" name="username" required>
             </div>
-            <div class="form-group">
+
+            <div class="form-group required">
                 <label for="password">パスワード</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            <div class="form-group">
+
+            <div class="form-group required">
                 <label for="confirm_password">パスワード（確認）</label>
                 <input type="password" id="confirm_password" name="confirm_password" required>
             </div>
-            <button type="submit" class="submit-btn">登録</button>
+
+            <div class="avatar-section">
+                <div class="avatar-preview">
+                    <div class="default-avatar"></div>
+                    <img id="avatar-img" alt="プロフィール画像">
+                </div>
+                <div class="avatar-upload">
+                    <label for="avatar" class="upload-btn">画像を選択</label>
+                    <input type="file" id="avatar" name="avatar" accept="image/*" style="display: none;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="birthday">誕生日</label>
+                <input type="date" id="birthday" name="birthday">
+            </div>
+
+            <div class="form-group">
+                <label for="zodiac_sign">星座</label>
+                <select id="zodiac_sign" name="zodiac_sign">
+                    <option value="">選択してください</option>
+                    <option value="牡羊座">牡羊座</option>
+                    <option value="牡牛座">牡牛座</option>
+                    <option value="双子座">双子座</option>
+                    <option value="蟹座">蟹座</option>
+                    <option value="獅子座">獅子座</option>
+                    <option value="乙女座">乙女座</option>
+                    <option value="天秤座">天秤座</option>
+                    <option value="蠍座">蠍座</option>
+                    <option value="射手座">射手座</option>
+                    <option value="山羊座">山羊座</option>
+                    <option value="水瓶座">水瓶座</option>
+                    <option value="魚座">魚座</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="mbti">MBTI</label>
+                <input type="text" id="mbti" name="mbti" maxlength="4" placeholder="例：INTJ">
+            </div>
+
+            <div class="form-group">
+                <label for="bio">自己紹介</label>
+                <textarea id="bio" name="bio" rows="4" placeholder="自己紹介を入力してください"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="save-btn">登録</button>
+            </div>
+
+            <div class="form-footer">
+                <p>既にアカウントをお持ちの方は <a href="{{ url_for('login') }}">ログイン</a></p>
+            </div>
         </form>
-        <div class="login-link">
-            すでにアカウントをお持ちの方は<a href="{{ url_for('login') }}">ログイン</a>
-        </div>
     </div>
-</body>
-</html> 
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const usernameInput = document.getElementById('username');
+    const avatarInput = document.getElementById('avatar');
+    const avatarPreview = document.getElementById('avatar-img');
+    const defaultAvatar = document.querySelector('.default-avatar');
+    const avatarContainer = document.querySelector('.avatar-preview');
+
+    // 生成随机颜色
+    function getRandomColor(username) {
+        const colors = [
+            '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e',
+            '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50',
+            '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12',
+            '#d35400', '#c0392b', '#7f8c8d'
+        ];
+        
+        const index = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+        return colors[index];
+    }
+
+    // 更新默认头像
+    function updateDefaultAvatar() {
+        const username = usernameInput.value.trim();
+        if (username) {
+            defaultAvatar.textContent = username[0].toUpperCase();
+            avatarContainer.style.setProperty('--avatar-color', getRandomColor(username));
+        } else {
+            defaultAvatar.textContent = '';
+            avatarContainer.style.setProperty('--avatar-color', '#45a049');
+        }
+    }
+
+    // 用户名输入事件
+    usernameInput.addEventListener('input', updateDefaultAvatar);
+
+    // 头像文件选择事件
+    avatarInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                avatarPreview.src = e.target.result;
+                avatarPreview.style.display = 'block';
+                defaultAvatar.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            avatarPreview.style.display = 'none';
+            defaultAvatar.style.display = 'flex';
+            updateDefaultAvatar();
+        }
+    });
+
+    // 表单验证
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        
+        if (password !== confirmPassword) {
+            e.preventDefault();
+            alert('パスワードが一致しません');
+        }
+    });
+});
+</script>
+{% endblock %} 
