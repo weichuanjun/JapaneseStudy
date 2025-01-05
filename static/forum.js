@@ -214,7 +214,7 @@ function loadUserPosts(userId) {
                 postsContainer.innerHTML = '';
 
                 if (data.posts.length === 0) {
-                    postsContainer.innerHTML = '<div class="no-posts">暂无发帖</div>';
+                    postsContainer.innerHTML = '<div class="no-posts">投稿はありません</div>';
                     return;
                 }
 
@@ -275,13 +275,13 @@ function formatDate(dateStr) {
     const padZero = (num) => String(num).padStart(2, '0');
 
     if (diff < minute) {
-        return '刚刚';
+        return 'たった今';
     } else if (diff < hour) {
-        return `${Math.floor(diff / minute)}分钟前`;
+        return `${Math.floor(diff / minute)}分前`;
     } else if (diff < day) {
-        return `${Math.floor(diff / hour)}小时前`;
+        return `${Math.floor(diff / hour)}時間前`;
     } else if (diff < week) {
-        return `${Math.floor(diff / day)}天前`;
+        return `${Math.floor(diff / day)}日前`;
     } else {
         const year = date.getFullYear();
         const month = padZero(date.getMonth() + 1);
@@ -337,7 +337,7 @@ function createPostCard(post) {
             <div class="post-title">${post.title}</div>
             <div class="post-content">${post.content}</div>
             <div class="post-footer">
-                <span class="post-comments">${post.comment_count} 回复</span>
+                <span class="post-comments">${post.comment_count} 件の返信</span>
             </div>
         </div>
     `;
@@ -446,7 +446,7 @@ function createPagination(total, pages, currentPage, container) {
     if (pages <= 1) return;
 
     const prevButton = document.createElement('button');
-    prevButton.textContent = '上一页';
+    prevButton.textContent = '前のページ';
     prevButton.disabled = currentPage === 1;
     prevButton.addEventListener('click', () => loadPosts(currentPage - 1));
     container.appendChild(prevButton);
@@ -460,7 +460,7 @@ function createPagination(total, pages, currentPage, container) {
     }
 
     const nextButton = document.createElement('button');
-    nextButton.textContent = '下一页';
+    nextButton.textContent = '次のページ';
     nextButton.disabled = currentPage === pages;
     nextButton.addEventListener('click', () => loadPosts(currentPage + 1));
     container.appendChild(nextButton);
@@ -529,13 +529,13 @@ function loadPostDetail() {
     fetch(`/forum/api/posts/${currentPostId}`)
         .then(response => {
             if (!response.ok) {
-                throw new Error('加载帖子详情失败');
+                throw new Error('投稿の詳細の読み込みに失敗しました');
             }
             return response.json();
         })
         .then(post => {
             if (post.error) {
-                console.error('加载帖子详情失败:', post.error);
+                console.error('投稿の詳細の読み込みに失敗しました:', post.error);
                 return;
             }
 
@@ -582,21 +582,21 @@ function loadPostDetail() {
             loadComments(currentPostId);
         })
         .catch(error => {
-            console.error('加载帖子详情失败:', error);
+            console.error('投稿の詳細の読み込みに失敗しました:', error);
         });
 }
 
 // 加载评论
 function loadComments(postId) {
     if (!postId) {
-        console.error('无效的帖子ID');
+        console.error('無効な投稿ID');
         return;
     }
 
     fetch(`/forum/api/posts/${postId}/comments`)
         .then(response => {
             if (!response.ok) {
-                throw new Error('加载评论失败');
+                throw new Error('コメントの読み込みに失敗しました');
             }
             return response.json();
         })
@@ -613,7 +613,7 @@ function loadComments(postId) {
             }
         })
         .catch(error => {
-            console.error('加载评论失败:', error);
+            console.error('コメントの読み込みに失敗しました:', error);
         });
 }
 
@@ -624,6 +624,7 @@ function handleNewPostSubmit(e) {
     const content = this.querySelector('[name="content"]').value.trim();
 
     if (!title || !content) {
+        console.error('タイトルと内容は必須です');
         return;
     }
 
@@ -636,13 +637,13 @@ function handleNewPostSubmit(e) {
     })
         .then(response => {
             if (!response.ok) {
-                throw new Error('帖子创建失败');
+                throw new Error('投稿の作成に失敗しました');
             }
             return response.json();
         })
         .then(post => {
             if (post.error) {
-                console.error('帖子创建失败:', post.error);
+                console.error('投稿の作成に失敗しました:', post.error);
                 return;
             }
             // 关闭模态框
@@ -654,7 +655,7 @@ function handleNewPostSubmit(e) {
             loadPosts(1);
         })
         .catch(error => {
-            console.error('创建帖子失败:', error);
+            console.error('投稿の作成に失敗しました:', error);
         });
 }
 
@@ -663,13 +664,14 @@ function handleNewCommentSubmit(e) {
     e.preventDefault();
 
     if (!currentPostId) {
-        console.error('没有选中的帖子ID');
+        console.error('投稿IDが選択されていません');
         return;
     }
 
     const contentInput = this.querySelector('[name="content"]');
     const content = contentInput.value.trim();
     if (!content) {
+        console.error('コメント内容は必須です');
         return;
     }
 
@@ -682,13 +684,13 @@ function handleNewCommentSubmit(e) {
     })
         .then(response => {
             if (!response.ok) {
-                throw new Error('评论创建失败');
+                throw new Error('コメントの作成に失敗しました');
             }
             return response.json();
         })
         .then(comment => {
             if (comment.error) {
-                console.error('评论创建失败:', comment.error);
+                console.error('コメントの作成に失敗しました:', comment.error);
                 return;
             }
 
@@ -704,7 +706,7 @@ function handleNewCommentSubmit(e) {
             commentElement.scrollIntoView({ behavior: 'smooth' });
         })
         .catch(error => {
-            console.error('创建评论失败:', error);
+            console.error('コメントの作成に失敗しました:', error);
         });
 }
 
