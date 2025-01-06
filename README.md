@@ -9,7 +9,6 @@
 - 🎤 AI 辅助发音练习
 - 💬 主题会话练习
 - 📝 学习社区论坛
-- 📱 响应式设计，支持移动端
 
 ## 技术特点
 
@@ -63,7 +62,7 @@ flask db upgrade
 flask run
 ```
 
-访问 http://localhost:5000 开始使用
+访问 http://localhost:5001 开始使用
 
 ## 配置说明
 
