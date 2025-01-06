@@ -27,53 +27,109 @@
 /* 导航栏样式 */
 .navbar {
     width: 100%;
-    background-color: white;
+    background-color: #45a049;
     box-shadow: var(--shadow-md);
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     z-index: 1000;
-    border-bottom: 1px solid var(--border-color);
-    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 60px;
     padding: 0;
 }
 
 .nav-list {
     display: flex;
-    justify-content: center;
+    align-items: center;
     list-style: none;
     margin: 0;
     padding: 0;
-    height: 60px;
+    height: 100%;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.nav-right {
+    position: absolute;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 10px;
+}
+
+.user-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: var(--avatar-color, #e0e0e0) !important;
+    border: 2px solid rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    position: relative !important;
+}
+
+.user-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 50% !important;
+}
+
+.default-avatar {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: white !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    background-color: var(--avatar-color, #e0e0e0) !important;
+    border-radius: 50% !important;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    margin: 0 20px;
+    margin: 0 10px;
 }
 
 .nav-link {
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
-    font-size: 1.1rem;
-    padding: 8px 16px;
-    border-radius: 6px;
+    padding: 8px 12px;
+    border-radius: 4px;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    font-size: 14px;
+    white-space: nowrap;
 }
 
 .nav-link:hover {
-    color: var(--primary-dark);
-    background-color: var(--primary-light);
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #fff;
 }
 
 .nav-link.active {
-    color: var(--primary-dark);
-    background-color: var(--primary-light);
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #fff;
     font-weight: 500;
 }
 
