@@ -813,25 +813,11 @@
 <!-- 读文章 Tab -->
 <div id="readTab" class="tab-content {% if active_tab == 'read' %}active{% endif %}">
     <div class="container" id="formcontainer">
-        <div class="difficulty-selector">
-            <div class="difficulty-label">難易度：</div>
-            <div class="difficulty-buttons">
-                <button class="difficulty-btn" data-difficulty="easy">
-                    <i class="fas fa-star"></i>
-                    <span>初級</span>
-                </button>
-                <button class="difficulty-btn" data-difficulty="medium">
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <span>中級</span>
-                </button>
-                <button class="difficulty-btn" data-difficulty="hard">
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <span>上級</span>
-                </button>
-            </div>
+        <!-- 发音练习的难易度标签 -->
+        <div class="difficulty-tags">
+            <div class="difficulty-tag" data-difficulty="easy" onclick="setDifficulty('easy')">初級</div>
+            <div class="difficulty-tag" data-difficulty="medium" onclick="setDifficulty('medium')">中級</div>
+            <div class="difficulty-tag" data-difficulty="hard" onclick="setDifficulty('hard')">上級</div>
         </div>
         <form id="reftextform">
             <textarea id="reftext" rows="6" cols="80" name="reftext" maxlength="160" placeholder="ここに参照テキストを入力してください..."></textarea>
@@ -895,25 +881,11 @@
 <!-- Topic Tab -->
 <div id="topicTab" class="tab-content {% if active_tab == 'topic' %}active{% endif %}">
     <div class="container">
-        <div class="difficulty-selector">
-            <div class="difficulty-label">難易度：</div>
-            <div class="difficulty-buttons">
-                <button class="difficulty-btn" data-difficulty="easy">
-                    <i class="fas fa-star"></i>
-                    <span>初級</span>
-                </button>
-                <button class="difficulty-btn" data-difficulty="medium">
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <span>中級</span>
-                </button>
-                <button class="difficulty-btn" data-difficulty="hard">
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <i class="fas fa-star"></i>
-                    <span>上級</span>
-                </button>
-            </div>
+        <!-- Topic练习的难易度标签 -->
+        <div class="difficulty-tags">
+            <div class="difficulty-tag" data-difficulty="easy" onclick="setTopicDifficulty('easy')">初級</div>
+            <div class="difficulty-tag" data-difficulty="medium" onclick="setTopicDifficulty('medium')">中級</div>
+            <div class="difficulty-tag" data-difficulty="hard" onclick="setTopicDifficulty('hard')">上級</div>
         </div>
         <textarea id="topicText" rows="8" cols="80" placeholder="ここにトピックが表示されます..."></textarea>
     </div>
@@ -1163,5 +1135,98 @@ document.addEventListener('DOMContentLoaded', function() {
         userInfoPopup.classList.remove('show');
     });
 });
+</script>
+
+<script>
+// 全局变量
+let currentDifficulty = 'easy';
+let currentTopicDifficulty = 'easy';
+
+// 初始化难度选择
+document.addEventListener('DOMContentLoaded', function() {
+    // 设置默认难度
+    setDifficulty('easy');
+    setTopicDifficulty('easy');
+});
+
+// 发音练习难度选择
+function setDifficulty(difficulty) {
+    const tags = document.querySelectorAll('#readTab .difficulty-tag');
+    tags.forEach(tag => {
+        tag.classList.remove('active');
+        if (tag.dataset.difficulty === difficulty) {
+            tag.classList.add('active');
+        }
+    });
+    currentDifficulty = difficulty;
+    getRandomText();
+}
+
+// Topic练习难度选择
+function setTopicDifficulty(difficulty) {
+    const tags = document.querySelectorAll('#topicTab .difficulty-tag');
+    tags.forEach(tag => {
+        tag.classList.remove('active');
+        if (tag.dataset.difficulty === difficulty) {
+            tag.classList.add('active');
+        }
+    });
+    currentTopicDifficulty = difficulty;
+    getRandomTopic();
+}
+
+// 获取随机文本
+function getRandomText() {
+    fetch('/api/reading/random', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
+        },
+        body: JSON.stringify({
+            difficulty: currentDifficulty
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('reftext').value = data.text;
+        } else {
+            console.error('Error getting random text:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+// 获取随机话题
+function getRandomTopic() {
+    fetch('/api/topic/random', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
+        },
+        body: JSON.stringify({
+            difficulty: currentTopicDifficulty
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('topicText').value = data.topic;
+        } else {
+            console.error('Error getting random topic:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+// 绑定生成按钮事件
+document.getElementById('generateText').addEventListener('click', getRandomText);
+document.getElementById('generateTopic').addEventListener('click', getRandomTopic);
 </script>
 {% endblock %}
