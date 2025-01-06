@@ -17,11 +17,12 @@ from forum import forum_bp
 from profile import profile_bp
 from werkzeug.utils import secure_filename
 from PIL import Image
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from ai_advisor import get_greeting, get_learning_advice
+from io import BytesIO
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
@@ -131,17 +132,11 @@ def register():
             file = request.files['avatar']
             if file and file.filename:
                 try:
-                    filename = secure_filename(file.filename)
-                    # 使用用户名和时间戳创建唯一文件名
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    new_filename = f"avatar_{timestamp}_{filename}"
+                    # 验证文件类型
+                    if not file.content_type.startswith('image/'):
+                        return render_template('register.html', error='画像ファイルのみアップロード可能です')
                     
-                    # 确保上传目录存在
-                    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                    
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
-                    
-                    # 保存并处理图片
+                    # 处理头像图片
                     img = Image.open(file)
                     
                     # 如果图片是RGBA模式（PNG格式），转换为RGB
@@ -149,6 +144,8 @@ def register():
                         background = Image.new('RGB', img.size, (255, 255, 255))
                         background.paste(img, mask=img.split()[3])
                         img = background
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
                     
                     # 调整图片大小为200x200，保持纵横比
                     img.thumbnail((200, 200), Image.Resampling.LANCZOS)
@@ -160,10 +157,14 @@ def register():
                     offset = ((200 - img.size[0]) // 2, (200 - img.size[1]) // 2)
                     output.paste(img, offset)
                     
-                    # 保存处理后的图片
-                    output.save(filepath, quality=95)
+                    # 将图片转换为Base64
+                    buffered = BytesIO()
+                    output.save(buffered, format="JPEG", quality=85, optimize=True)
+                    img_str = base64.b64encode(buffered.getvalue()).decode()
                     
-                    user.avatar_path = os.path.join('uploads/avatars', new_filename)
+                    # 保存Base64编码的图片数据
+                    user.avatar_data = f"data:image/jpeg;base64,{img_str}"
+                    
                 except Exception as e:
                     app.logger.error(f"Error saving avatar: {str(e)}")
                     return render_template('register.html', error='画像のアップロードに失敗しました')
