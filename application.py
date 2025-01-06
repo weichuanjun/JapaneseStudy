@@ -1052,3 +1052,67 @@ def get_user_advice():
             "success": False,
             "error": "アドバイスの生成に失敗しました。しばらくしてからもう一度お試しください。"
         }), 500
+
+@app.route("/api/text/random", methods=["POST"])
+def generate_practice_text():
+    """生成发音练习文本"""
+    try:
+        difficulty = request.json.get('difficulty', 'medium')  # 默认中等难度
+        logging.info(f"开始生成{difficulty}难度的练习文本")
+        
+        # 根据难度调整参数
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+
+        # 根据难度级别选择不同的提示词
+        difficulty_prompts = {
+            'easy': """初級レベルの日本語学習者向けの練習文を生成してください。
+- 基本的な語彙と文法（N5-N4レベル）を使用
+- 日常生活に関連する身近な内容
+- 短めの文章（30-50文字程度）
+- ひらがなを多めに使用""",
+            
+            'medium': """中級レベルの日本語学習者向けの練習文を生成してください。
+- 中級程度の語彙と文法（N3-N2レベル）を使用
+- より幅広い話題を含める
+- 適度な長さの文章（50-80文字程度）
+- 漢字とひらがなをバランスよく使用""",
+            
+            'hard': """上級レベルの日本語学習者向けの練習文を生成してください。
+- 高度な語彙と文法（N2-N1レベル）を使用
+- 複雑な内容や時事的な話題を含める
+- やや長めの文章（80-120文字程度）
+- 漢字を積極的に使用"""}
+        
+        base_prompt = """以下の条件で、発音練習用の文章を1つ生成してください：
+
+{difficulty_specific}
+
+回答は以下の形式で：
+- 指定された文字数制限を守る
+- 自然な日本語の文章
+- 発音練習に適した文章
+- 学習者が興味を持てる内容"""
+
+        prompt = base_prompt.format(difficulty_specific=difficulty_prompts[difficulty])
+        
+        # 生成内容
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            logging.error("Gemini API返回空响应")
+            return jsonify({"success": False, "message": "文章生成に失敗しました"})
+            
+        logging.info("成功收到Gemini响应")
+        return jsonify({"success": True, "text": response.text.strip()})
+        
+    except Exception as e:
+        logging.error(f"生成练习文本时出错: {str(e)}")
+        return jsonify({"success": False, "message": "文章生成に失敗しました"})

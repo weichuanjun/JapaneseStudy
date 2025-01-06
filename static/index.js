@@ -46,6 +46,10 @@ var t0 = 0;
 var t1;
 var at;
 
+// 全局变量
+let currentDifficulty = 'medium';
+let currentTopicDifficulty = 'medium';
+
 window.onload = () => {
     if (tflag) {
         tflag = gettoken();
@@ -430,7 +434,6 @@ function fillData(data) {
 function createDownloadLink(blob) {
     reftextval = reftext.value;
     var url = URL.createObjectURL(blob);
-    const selectedDifficulty = document.querySelector('.difficulty-btn.active').dataset.difficulty;
 
     var container = document.createElement('div');
     container.className = 'audio-container';
@@ -476,51 +479,97 @@ function createDownloadLink(blob) {
     const data = new FormData();
     data.append("audio_data", blob, new Date().toISOString());
     data.append("reftext", reftextval);
-    data.append("difficulty", selectedDifficulty);
+    data.append("difficulty", currentDifficulty);
 
     request.send(data);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // 难度选择按钮处理
-    const difficultyBtns = document.querySelectorAll('.difficulty-btn');
-    let selectedDifficulty = 'medium'; // 默认中等难度
-
-    if (difficultyBtns) {
-        difficultyBtns.forEach(btn => {
-            btn.addEventListener('click', function () {
-                // 移除所有按钮的激活状态
-                difficultyBtns.forEach(b => b.classList.remove('active'));
-                // 激活当前按钮
+    // 发音练习难度选择按钮处理
+    const readingDifficultyTags = document.querySelectorAll('#readTab .difficulty-tag');
+    if (readingDifficultyTags) {
+        readingDifficultyTags.forEach(tag => {
+            tag.addEventListener('click', function () {
+                // 移除所有标签的激活状态
+                readingDifficultyTags.forEach(t => t.classList.remove('active'));
+                // 激活当前标签
                 this.classList.add('active');
-                // 更新选中的难度
-                selectedDifficulty = this.dataset.difficulty;
+                // 更新当前难度
+                currentDifficulty = this.dataset.difficulty;
+                console.log('Reading difficulty changed to:', currentDifficulty);
             });
         });
-
-        // 默认激活中等难度按钮
-        document.querySelector('[data-difficulty="medium"]').classList.add('active');
+        // 默认激活中等难度
+        document.querySelector('#readTab .difficulty-tag[data-difficulty="medium"]').classList.add('active');
     }
 
+    // Topic练习难度选择按钮处理
+    const topicDifficultyTags = document.querySelectorAll('#topicTab .difficulty-tag');
+    if (topicDifficultyTags) {
+        topicDifficultyTags.forEach(tag => {
+            tag.addEventListener('click', function () {
+                // 移除所有标签的激活状态
+                topicDifficultyTags.forEach(t => t.classList.remove('active'));
+                // 激活当前标签
+                this.classList.add('active');
+                // 更新当前难度
+                currentTopicDifficulty = this.dataset.difficulty;
+                console.log('Topic difficulty changed to:', currentTopicDifficulty);
+            });
+        });
+        // 默认激活中等难度
+        document.querySelector('#topicTab .difficulty-tag[data-difficulty="medium"]').classList.add('active');
+    }
+
+    // 生成文本按钮点击事件
     document.getElementById('generateText').addEventListener('click', function () {
-        console.log("Generate button clicked");
+        console.log('Generating text with difficulty:', currentDifficulty);
         this.classList.add('breathing-button');
 
-        fetch('/generate_text', {
+        fetch('/api/text/random', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
             },
-            body: JSON.stringify({ difficulty: selectedDifficulty })
+            body: JSON.stringify({ difficulty: currentDifficulty })
         })
             .then(response => response.json())
             .then(data => {
-                console.log("Received data:", data);
-                document.getElementById('reftext').value = data.text;
+                if (data.success) {
+                    document.getElementById('reftext').value = data.text;
+                } else {
+                    console.error('Error getting random text:', data.message);
+                }
                 this.classList.remove('breathing-button');
             })
             .catch(error => {
                 console.error('Error:', error);
+                this.classList.remove('breathing-button');
+            });
+    });
+
+    // 生成话题按钮点击事件
+    document.getElementById('generateTopic').addEventListener('click', function () {
+        console.log('Generating topic with difficulty:', currentTopicDifficulty);
+        this.classList.add('breathing-button');
+
+        fetch('/generate_topic', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
+            },
+            body: JSON.stringify({ difficulty: currentTopicDifficulty })
+        })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('topicText').value = data.topic;
+                this.classList.remove('breathing-button');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('topicText').value = 'トピック生成に失敗しました';
                 this.classList.remove('breathing-button');
             });
     });
@@ -628,12 +677,10 @@ document.addEventListener('DOMContentLoaded', function () {
                             const audioBlob = new Blob(topicChunks, { type: 'audio/webm' });
                             console.log("创建的音频Blob大小:", audioBlob.size, "bytes");
 
-                            const selectedDifficulty = document.querySelector('.difficulty-btn.active').dataset.difficulty;
-
                             const formData = new FormData();
                             formData.append('audio', audioBlob, 'recording.webm');
                             formData.append('topic', document.getElementById('topicText').value);
-                            formData.append('difficulty', selectedDifficulty);
+                            formData.append('difficulty', currentTopicDifficulty);
 
                             transcribedText.value = '音声を認識しています...';
 
@@ -781,4 +828,54 @@ async function analyzeTopic(text, topic) {
 function handleTranscriptionComplete(text, topic) {
     document.getElementById('transcribedText').value = text;
     analyzeTopic(text, topic);
+}
+
+// 获取随机话题
+function getRandomTopic() {
+    fetch('/api/topic/random', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
+        },
+        body: JSON.stringify({
+            difficulty: currentTopicDifficulty
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('topicText').value = data.topic;
+            } else {
+                console.error('Error getting random topic:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+// 获取随机文本
+function getRandomText() {
+    fetch('/api/text/random', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
+        },
+        body: JSON.stringify({
+            difficulty: currentDifficulty
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('reftext').value = data.text;
+            } else {
+                console.error('Error getting random text:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 }

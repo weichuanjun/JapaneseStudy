@@ -1484,3 +1484,58 @@ table.dynamic-content.show {
     flex: 1;
     max-width: 400px;
 }
+
+/* 难易度标签样式 */
+.difficulty-tags {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+}
+
+.difficulty-tag {
+    padding: 8px 24px;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid var(--primary-color);
+    background-color: white;
+    color: var(--primary-color);
+    text-align: center;
+    min-width: 100px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+}
+
+.difficulty-tag:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background-color: var(--primary-light);
+}
+
+.difficulty-tag.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.difficulty-tag.active::after {
+    content: "✓";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+/* 移除旧的难度选择器样式 */
+.difficulty-selector,
+.difficulty-buttons,
+.difficulty-btn {
+    display: none;
+}
