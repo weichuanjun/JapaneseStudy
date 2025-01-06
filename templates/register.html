@@ -6,113 +6,283 @@
 <style>
     body {
         font-family: Arial, sans-serif;
-        background-color: #f5f5f5;
+        background-color: var(--secondary-color);
         margin: 0;
-        padding: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        padding: 20px;
         min-height: 100vh;
     }
     
-    .register-container {
+    .profile-container {
         background-color: white;
-        padding: 2rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        border-radius: 16px;
+        box-shadow: var(--shadow-md);
         width: 100%;
-        max-width: 400px;
+        max-width: 500px;
+        margin: 40px auto;
+        border: 1px solid var(--border-color);
+        animation: slideUp 0.5s ease-out;
     }
     
-    .register-container h1 {
+    .profile-header {
         text-align: center;
-        color: #333;
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .profile-header h1 {
+        color: var(--text-primary);
+        font-size: 1.8rem;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .profile-content {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
     }
     
     .form-group {
-        margin-bottom: 1rem;
+        margin-bottom: 1.2rem;
     }
     
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
-        color: #666;
+        color: var(--text-primary);
+        font-weight: 500;
+        font-size: 0.95rem;
     }
     
-    .form-group input {
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
         width: 100%;
-        padding: 0.5rem;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+        padding: 12px 16px;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
         font-size: 1rem;
+        color: var(--text-primary);
+        background-color: var(--secondary-color);
+        transition: all 0.3s ease;
     }
     
-    .submit-btn {
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        background-color: white;
+        box-shadow: 0 0 0 4px var(--primary-light);
+    }
+    
+    /* 星座下拉菜单样式 */
+    #zodiac_sign {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236B796A' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        padding-right: 2.5rem;
+    }
+    
+    #zodiac_sign:focus {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2388A886' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    }
+    
+    /* 改进头像预览区域样式 */
+    .avatar-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        margin: 1.5rem 0;
+        position: relative;
+    }
+    
+    .avatar-preview {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background-color: var(--avatar-color, var(--primary-color));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 48px;
+        font-weight: 500;
+        text-transform: uppercase;
+        overflow: hidden;
+        border: 3px solid white;
+        box-shadow: var(--shadow-md);
+        transition: all 0.3s ease;
+        position: relative;
+        cursor: pointer;
+    }
+    
+    .avatar-preview:hover {
+        transform: scale(1.05);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .avatar-preview:hover::after {
+        content: "変更";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        font-size: 14px;
+        padding: 4px 0;
+        text-align: center;
+    }
+    
+    .default-avatar {
         width: 100%;
-        padding: 0.75rem;
-        background-color: #4CAF50;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 48px;
+        color: white;
+        text-transform: uppercase;
+    }
+    
+    #avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: none;
+    }
+    
+    .avatar-upload {
+        margin-top: 0.5rem;
+        text-align: center;
+    }
+    
+    .upload-btn {
+        display: inline-block;
+        padding: 8px 16px;
+        background-color: var(--primary-light);
+        color: var(--primary-dark);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .upload-btn:hover {
+        background-color: var(--primary-color);
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .upload-status {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        display: none;
+    }
+    
+    .upload-status.show {
+        display: block;
+    }
+    
+    .form-actions {
+        margin-top: 2rem;
+    }
+    
+    .save-btn {
+        width: 100%;
+        padding: 14px;
+        background-color: var(--primary-color);
         color: white;
         border: none;
-        border-radius: 4px;
-        font-size: 1rem;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 500;
         cursor: pointer;
-        margin-top: 1rem;
+        transition: all 0.3s ease;
     }
     
-    .submit-btn:hover {
-        background-color: #45a049;
+    .save-btn:hover {
+        background-color: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
     }
     
-    .login-link {
+    .form-footer {
         text-align: center;
-        margin-top: 1rem;
+        margin-top: 1.5rem;
+        color: var(--text-secondary);
+        font-size: 0.95rem;
     }
     
-    .login-link a {
-        color: #4CAF50;
+    .form-footer a {
+        color: var(--primary-color);
         text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s ease;
     }
     
-    .login-link a:hover {
+    .form-footer a:hover {
+        color: var(--primary-dark);
         text-decoration: underline;
     }
     
     .error-message {
-        color: #f44336;
-        text-align: center;
+        background-color: var(--error-color);
+        color: var(--text-primary);
+        padding: 12px 16px;
+        border-radius: 8px;
         margin-bottom: 1rem;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
-.avatar-preview {
-    width: 200px;
-    height: 200px;
-    border-radius: 50%;
-    background-color: var(--avatar-color, #45a049);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 72px;
-    font-weight: 500;
-    text-transform: uppercase;
-    overflow: hidden;
-    margin: 0 auto;
-}
-
-.avatar-preview img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: none;
-}
-
-.default-avatar {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+    
+    .required label::after {
+        content: "*";
+        color: var(--error-color);
+        margin-left: 4px;
+    }
+    
+    textarea {
+        resize: vertical;
+        min-height: 100px;
+        font-family: inherit;
+        line-height: 1.5;
+    }
+    
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @media (max-width: 600px) {
+        .profile-container {
+            padding: 1.5rem;
+            margin: 20px auto;
+        }
+        
+        .profile-header h1 {
+            font-size: 1.5rem;
+        }
+        
+        .avatar-preview {
+            width: 100px;
+            height: 100px;
+            font-size: 36px;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -144,13 +314,14 @@
             </div>
 
             <div class="avatar-section">
-                <div class="avatar-preview">
+                <div class="avatar-preview" onclick="document.getElementById('avatar').click()">
                     <div class="default-avatar"></div>
                     <img id="avatar-img" alt="プロフィール画像">
                 </div>
                 <div class="avatar-upload">
                     <label for="avatar" class="upload-btn">画像を選択</label>
                     <input type="file" id="avatar" name="avatar" accept="image/*" style="display: none;">
+                    <div class="upload-status"></div>
                 </div>
             </div>
 
@@ -208,6 +379,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const avatarPreview = document.getElementById('avatar-img');
     const defaultAvatar = document.querySelector('.default-avatar');
     const avatarContainer = document.querySelector('.avatar-preview');
+    const uploadStatus = document.querySelector('.upload-status');
 
     // 生成随机颜色
     function getRandomColor(username) {
@@ -229,31 +401,89 @@ document.addEventListener('DOMContentLoaded', function() {
             defaultAvatar.textContent = username[0].toUpperCase();
             avatarContainer.style.setProperty('--avatar-color', getRandomColor(username));
         } else {
-            defaultAvatar.textContent = '';
-            avatarContainer.style.setProperty('--avatar-color', '#45a049');
+            defaultAvatar.textContent = '?';
+            avatarContainer.style.setProperty('--avatar-color', 'var(--primary-color)');
         }
     }
 
-    // 用户名输入事件
-    usernameInput.addEventListener('input', updateDefaultAvatar);
-
-    // 头像文件选择事件
-    avatarInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
+    // 更新头像显示
+    function updateAvatarDisplay(file = null) {
         if (file) {
             const reader = new FileReader();
             reader.onload = function(e) {
                 avatarPreview.src = e.target.result;
                 avatarPreview.style.display = 'block';
                 defaultAvatar.style.display = 'none';
+                uploadStatus.textContent = 'アップロード完了';
+                uploadStatus.style.color = 'var(--success-color)';
+                uploadStatus.classList.add('show');
+            };
+            reader.onerror = function() {
+                avatarPreview.style.display = 'none';
+                defaultAvatar.style.display = 'flex';
+                uploadStatus.textContent = 'アップロードに失敗しました';
+                uploadStatus.style.color = 'var(--error-color)';
+                uploadStatus.classList.add('show');
+                updateDefaultAvatar();
             };
             reader.readAsDataURL(file);
         } else {
             avatarPreview.style.display = 'none';
             defaultAvatar.style.display = 'flex';
+            uploadStatus.classList.remove('show');
+            updateDefaultAvatar();
+        }
+    }
+
+    // 验证文件类型和大小
+    function validateFile(file) {
+        const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        const maxSize = 5 * 1024 * 1024; // 5MB
+
+        if (!validTypes.includes(file.type)) {
+            return 'JPG、PNG、GIF形式のみ対応しています。';
+        }
+
+        if (file.size > maxSize) {
+            return 'ファイルサイズは5MB以下にしてください。';
+        }
+
+        return null;
+    }
+
+    // 用户名输入事件
+    usernameInput.addEventListener('input', function() {
+        if (!avatarPreview.src || avatarPreview.style.display === 'none') {
             updateDefaultAvatar();
         }
     });
+
+    // 头像文件选择事件
+    avatarInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const error = validateFile(file);
+            if (error) {
+                uploadStatus.textContent = error;
+                uploadStatus.style.color = 'var(--error-color)';
+                uploadStatus.classList.add('show');
+                avatarInput.value = '';
+                updateAvatarDisplay(null);
+                return;
+            }
+            updateAvatarDisplay(file);
+        } else {
+            updateAvatarDisplay(null);
+        }
+    });
+
+    // 点击头像预览区域触发文件选择
+    avatarContainer.addEventListener('click', function() {
+        avatarInput.click();
+    });
+
+    // 初始化默认头像
+    updateDefaultAvatar();
 
     // 表单验证
     const form = document.querySelector('form');

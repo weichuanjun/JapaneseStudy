@@ -17,11 +17,12 @@ from forum import forum_bp
 from profile import profile_bp
 from werkzeug.utils import secure_filename
 from PIL import Image
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from ai_advisor import get_greeting, get_learning_advice
+from io import BytesIO
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
@@ -131,17 +132,11 @@ def register():
             file = request.files['avatar']
             if file and file.filename:
                 try:
-                    filename = secure_filename(file.filename)
-                    # 使用用户名和时间戳创建唯一文件名
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    new_filename = f"avatar_{timestamp}_{filename}"
+                    # 验证文件类型
+                    if not file.content_type.startswith('image/'):
+                        return render_template('register.html', error='画像ファイルのみアップロード可能です')
                     
-                    # 确保上传目录存在
-                    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                    
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
-                    
-                    # 保存并处理图片
+                    # 处理头像图片
                     img = Image.open(file)
                     
                     # 如果图片是RGBA模式（PNG格式），转换为RGB
@@ -149,6 +144,8 @@ def register():
                         background = Image.new('RGB', img.size, (255, 255, 255))
                         background.paste(img, mask=img.split()[3])
                         img = background
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
                     
                     # 调整图片大小为200x200，保持纵横比
                     img.thumbnail((200, 200), Image.Resampling.LANCZOS)
@@ -160,10 +157,14 @@ def register():
                     offset = ((200 - img.size[0]) // 2, (200 - img.size[1]) // 2)
                     output.paste(img, offset)
                     
-                    # 保存处理后的图片
-                    output.save(filepath, quality=95)
+                    # 将图片转换为Base64
+                    buffered = BytesIO()
+                    output.save(buffered, format="JPEG", quality=85, optimize=True)
+                    img_str = base64.b64encode(buffered.getvalue()).decode()
                     
-                    user.avatar_path = os.path.join('uploads/avatars', new_filename)
+                    # 保存Base64编码的图片数据
+                    user.avatar_data = f"data:image/jpeg;base64,{img_str}"
+                    
                 except Exception as e:
                     app.logger.error(f"Error saving avatar: {str(e)}")
                     return render_template('register.html', error='画像のアップロードに失敗しました')
@@ -184,12 +185,18 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
+@app.route('/index')
+@login_required
+def index_redirect():
+    return redirect(url_for('index', active_tab=request.args.get('active_tab', 'dashboard')))
+
 @app.route('/')
 @login_required
 def index():
     active_tab = request.args.get('active_tab', 'dashboard')
     current_user = User.query.get(session['user_id'])
     return render_template('index.html', active_tab=active_tab, current_user=current_user)
+
 # 保存阅读练习记录
 def save_reading_record(user_id, content, scores, difficulty='medium'):
     user = User.query.get(user_id)
@@ -1046,3 +1053,67 @@ def get_user_advice():
             "success": False,
             "error": "アドバイスの生成に失敗しました。しばらくしてからもう一度お試しください。"
         }), 500
+
+@app.route("/api/text/random", methods=["POST"])
+def generate_practice_text():
+    """生成发音练习文本"""
+    try:
+        difficulty = request.json.get('difficulty', 'medium')  # 默认中等难度
+        logging.info(f"开始生成{difficulty}难度的练习文本")
+        
+        # 根据难度调整参数
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+
+        # 根据难度级别选择不同的提示词
+        difficulty_prompts = {
+            'easy': """初級レベルの日本語学習者向けの練習文を生成してください。
+- 基本的な語彙と文法（N5-N4レベル）を使用
+- 日常生活に関連する身近な内容
+- 短めの文章（30-50文字程度）
+- ひらがなを多めに使用""",
+            
+            'medium': """中級レベルの日本語学習者向けの練習文を生成してください。
+- 中級程度の語彙と文法（N3-N2レベル）を使用
+- より幅広い話題を含める
+- 適度な長さの文章（50-80文字程度）
+- 漢字とひらがなをバランスよく使用""",
+            
+            'hard': """上級レベルの日本語学習者向けの練習文を生成してください。
+- 高度な語彙と文法（N2-N1レベル）を使用
+- 複雑な内容や時事的な話題を含める
+- やや長めの文章（80-120文字程度）
+- 漢字を積極的に使用"""}
+        
+        base_prompt = """以下の条件で、発音練習用の文章を1つ生成してください：
+
+{difficulty_specific}
+
+回答は以下の形式で：
+- 指定された文字数制限を守る
+- 自然な日本語の文章
+- 発音練習に適した文章
+- 学習者が興味を持てる内容"""
+
+        prompt = base_prompt.format(difficulty_specific=difficulty_prompts[difficulty])
+        
+        # 生成内容
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        
+        if not response or not response.text:
+            logging.error("Gemini API返回空响应")
+            return jsonify({"success": False, "message": "文章生成に失敗しました"})
+            
+        logging.info("成功收到Gemini响应")
+        return jsonify({"success": True, "text": response.text.strip()})
+        
+    except Exception as e:
+        logging.error(f"生成练习文本时出错: {str(e)}")
+        return jsonify({"success": False, "message": "文章生成に失敗しました"})
