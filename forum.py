@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for, current_app
-from models import db, Post, Comment, User, Tag, AIMemory, AIRelationship, AIPersonality
+from models import db, Post, Comment, User, Tag, AIMemory, AIRelationship, AIPersonality, AIInteraction, AffinityHistory
 import google.generativeai as genai
 from config import GEMINI_API_KEY, GEMINI_MODEL
 import logging
@@ -10,16 +10,39 @@ import time
 import queue
 import random
 from sqlalchemy.orm import scoped_session, sessionmaker
+import os
 
-# 配置日志
+# 确保logs目录存在
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler('forum.log'),
+        logging.FileHandler('logs/forum.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
+
+# 创建一个专门的日志记录器
+logger = logging.getLogger('forum')
+logger.setLevel(logging.INFO)
+
+def log_debug(msg):
+    """记录调试信息"""
+    logger.debug(msg)
+    print(f"[DEBUG] {msg}")
+
+def log_info(msg):
+    """记录普通信息"""
+    logger.info(msg)
+    print(f"[INFO] {msg}")
+
+def log_error(msg):
+    """记录错误信息"""
+    logger.error(msg)
+    print(f"[ERROR] {msg}")
 
 # 配置 Gemini API
 try:
@@ -60,13 +83,13 @@ def login_required(f):
 def add_ai_response(post_id, content, user_id=None):
     """添加 AI 回复"""
     try:
-        logging.info(f"开始添加AI回复，post_id: {post_id}, user_id: {user_id}")
+        log_info(f"开始添加AI回复，post_id: {post_id}, user_id: {user_id}")
         
         # 生成 AI 回复
         try:
             ai_response = generate_ai_response(content, post_id, user_id)
         except (AIResponseError, DatabaseError) as e:
-            logging.error(f"AI 回复生成失败: {str(e)}")
+            log_error(f"AI 回复生成失败: {str(e)}")
             return False
 
         try:
@@ -74,22 +97,77 @@ def add_ai_response(post_id, content, user_id=None):
             ai_comment = Comment(
                 content=ai_response,
                 post_id=post_id,
-                user_id=MOMO_USER_ID,  # 使用固定的 momo 用户 ID
+                user_id=MOMO_USER_ID,
                 created_at=datetime.now()
             )
             db.session.add(ai_comment)
-            db.session.commit()
+            log_info(f"AI评论已创建: {ai_comment.content[:100]}...")
             
-            logging.info(f"AI 回复已添加到数据库，post_id: {post_id}")
+            # 记录互动
+            if user_id:
+                log_info(f"开始处理用户 {user_id} 的互动记录")
+                
+                # 分析情感
+                sentiment_score = analyze_sentiment(content)
+                log_info(f"情感分析得分: {sentiment_score}")
+                
+                # 记录互动历史
+                interaction = AIInteraction(
+                    user_id=user_id,
+                    content=content,
+                    response=ai_response,
+                    sentiment_score=sentiment_score,
+                    interaction_type='forum_reply'
+                )
+                db.session.add(interaction)
+                log_info(f"已创建互动记录")
+
+                # 记录记忆
+                memory = AIMemory(
+                    user_id=user_id,
+                    post_id=post_id,
+                    interaction_content=content,
+                    ai_response=ai_response,
+                    sentiment_score=sentiment_score
+                )
+                db.session.add(memory)
+                log_info(f"已创建记忆记录")
+                
+                # 更新关系
+                relationship = get_or_create_relationship(user_id)
+                old_score = relationship.affinity_score
+                log_info(f"当前亲密度: {old_score}")
+                
+                relationship.adjust_affinity(sentiment_score)
+                relationship.interaction_count += 1
+                relationship.last_interaction_at = datetime.now()
+                
+                log_info(f"亲密度更新: {old_score} -> {relationship.affinity_score}")
+                log_info(f"互动次数: {relationship.interaction_count}")
+                log_info(f"最后互动时间: {relationship.last_interaction_at}")
+                
+                # 记录好感度变化
+                if old_score != relationship.affinity_score:
+                    affinity_change = AffinityHistory(
+                        user_id=user_id,
+                        old_score=old_score,
+                        new_score=relationship.affinity_score,
+                        change_reason=f'论坛回复 - 情感分数: {sentiment_score}'
+                    )
+                    db.session.add(affinity_change)
+                    log_info(f"已记录亲密度变化历史: {old_score} -> {relationship.affinity_score}")
+            
+            db.session.commit()
+            log_info("所有数据库更新已提交")
             return True
             
         except Exception as db_error:
             db.session.rollback()
-            logging.error(f"数据库操作失败: {str(db_error)}")
+            log_error(f"数据库操作失败: {str(db_error)}")
             raise DatabaseError("保存AI回复失败") from db_error
             
     except Exception as e:
-        logging.error(f"添加 AI 回复时出错: {str(e)}")
+        log_error(f"添加 AI 回复时出错: {str(e)}")
         if isinstance(e, (AIResponseError, DatabaseError)):
             raise
         raise RuntimeError("添加AI回复时发生未知错误") from e
@@ -114,19 +192,29 @@ def get_or_create_relationship(user_id):
     """获取或创建用户与 AI 的关系记录"""
     try:
         relationship = AIRelationship.query.filter_by(user_id=user_id).first()
-        if not relationship:
-            relationship = AIRelationship(user_id=user_id)
+        if relationship:
+            log_info(f"找到现有关系记录 - 用户ID: {user_id}, 亲密度: {relationship.affinity_score}, 互动次数: {relationship.interaction_count}")
+        else:
+            log_info(f"为用户 {user_id} 创建新的关系记录")
+            relationship = AIRelationship(
+                user_id=user_id,
+                affinity_score=50.0,
+                interaction_count=0,
+                last_interaction_at=datetime.now()
+            )
             db.session.add(relationship)
             db.session.commit()
+            log_info(f"新关系记录创建成功 - 初始亲密度: {relationship.affinity_score}")
         return relationship
     except Exception as e:
-        logging.error(f"获取或创建用户关系时出错: {str(e)}")
+        log_error(f"获取或创建用户关系时出错: {str(e)}")
         db.session.rollback()
         raise DatabaseError("获取或创建用户关系失败") from e
 
 def analyze_sentiment(text):
     """分析文本情感倾向"""
     try:
+        log_info(f"开始情感分析，文本: {text[:100]}...")
         prompt = f"""以下の文章の感情分析を行い、-1から1の間のスコアで評価してください。
 ポジティブな感情は正の値、ネガティブな感情は負の値、中立は0とします。
 返答は数値のみにしてください。
@@ -137,17 +225,20 @@ def analyze_sentiment(text):
         if response and response.text:
             try:
                 sentiment_score = float(response.text.strip())
-                return max(-1, min(1, sentiment_score))  # 确保值在 -1 到 1 之间
+                sentiment_score = max(-1, min(1, sentiment_score))  # 确保值在 -1 到 1 之间
+                log_info(f"情感分析完成，分数: {sentiment_score}")
+                return sentiment_score
             except ValueError:
+                log_warning("无法解析情感分数，使用默认值0")
                 return 0
     except Exception as e:
-        logging.error(f"感情分析出错: {str(e)}")
+        log_error(f"感情分析出错: {str(e)}")
         raise AIResponseError("感情分析失败") from e
 
 def generate_ai_response(content, post_id=None, user_id=None):
     """使用 Gemini API 生成 AI 回复"""
     try:
-        logging.info(f"开始生成AI回复，输入内容: {content}, post_id: {post_id}, user_id: {user_id}")
+        log_info(f"开始生成AI回复，输入内容: {content}, post_id: {post_id}, user_id: {user_id}")
         
         # 获取 AI 人格设定
         ai_personality = AIPersonality.query.first()
@@ -159,11 +250,11 @@ def generate_ai_response(content, post_id=None, user_id=None):
                 if not ai_personality:
                     raise AIResponseError("AI人格初始化失败")
             except Exception as e:
-                logging.error(f"初始化AI人格时出错: {str(e)}")
+                log_error(f"初始化AI人格时出错: {str(e)}")
                 raise AIResponseError("AI人格初始化失败") from e
         
-        logging.info("成功获取AI人格设定")
-        logging.info(f"AI人格信息:\n角色: {ai_personality.role}\n背景: {ai_personality.background}\n性格: {ai_personality.personality_traits}\n兴趣: {ai_personality.interests}\n沟通风格: {ai_personality.communication_style}")
+        log_info("成功获取AI人格设定")
+        log_info(f"AI人格信息:\n角色: {ai_personality.role}\n背景: {ai_personality.background}\n性格: {ai_personality.personality_traits}\n兴趣: {ai_personality.interests}\n沟通风格: {ai_personality.communication_style}")
         
         # 获取用户与 AI 的关系和互动历史
         relationship = None
@@ -172,10 +263,10 @@ def generate_ai_response(content, post_id=None, user_id=None):
             try:
                 relationship = get_or_create_relationship(user_id)
                 interaction_history = get_user_interaction_history(user_id)
-                logging.info(f"获取到用户关系 - 亲密度: {relationship.affinity_score}, 互动次数: {relationship.interaction_count}")
-                logging.info(f"获取到{len(interaction_history)}条历史互动记录")
+                log_info(f"获取到用户关系 - 亲密度: {relationship.affinity_score}, 互动次数: {relationship.interaction_count}")
+                log_info(f"获取到{len(interaction_history)}条历史互动记录")
             except DatabaseError as e:
-                logging.error(f"获取用户数据时出错: {str(e)}")
+                log_error(f"获取用户数据时出错: {str(e)}")
                 # 继续执行，使用默认值
         
         # 构建提示词
@@ -202,8 +293,8 @@ def generate_ai_response(content, post_id=None, user_id=None):
             for interaction in interaction_history:
                 prompt += f"ユーザー: {interaction['user_content']}\n"
                 prompt += f"momo: {interaction['ai_response']}\n"
-                logging.info(f"添加历史对话 - 用户: {interaction['user_content'][:50]}...")
-                logging.info(f"添加历史对话 - AI回复: {interaction['ai_response'][:50]}...")
+                log_info(f"添加历史对话 - 用户: {interaction['user_content'][:50]}...")
+                log_info(f"添加历史对话 - AI回复: {interaction['ai_response'][:50]}...")
 
         # 添加关系信息
         if relationship:
@@ -212,7 +303,7 @@ def generate_ai_response(content, post_id=None, user_id=None):
 - 親密度: {relationship.affinity_score}/100 (この親密度に応じた適切な返信を心がけてください)
 - 対話回数: {relationship.interaction_count}回
 """
-            logging.info(f"添加关系信息 - 亲密度: {relationship.affinity_score}, 对话次数: {relationship.interaction_count}")
+            log_info(f"添加关系信息 - 亲密度: {relationship.affinity_score}, 对话次数: {relationship.interaction_count}")
 
         # 获取帖子上下文
         context = ""
@@ -229,11 +320,11 @@ def generate_ai_response(content, post_id=None, user_id=None):
                     for comment in comments:
                         if comment.user_id != MOMO_USER_ID:
                             context += f"- {comment.content}\n"
-                    logging.info(f"添加帖子上下文 - 标题: {post.title}, 评论数: {len(comments)}")
-                    logging.info(f"帖子内容: {post.content}")
-                    logging.info(f"评论内容: {[c.content for c in comments if c.user_id != MOMO_USER_ID]}")
+                    log_info(f"添加帖子上下文 - 标题: {post.title}, 评论数: {len(comments)}")
+                    log_info(f"帖子内容: {post.content}")
+                    log_info(f"评论内容: {[c.content for c in comments if c.user_id != MOMO_USER_ID]}")
             except Exception as e:
-                logging.error(f"获取帖子上下文时出错: {str(e)}")
+                log_error(f"获取帖子上下文时出错: {str(e)}")
                 # 继续执行，使用空上下文
 
         prompt += f"""
@@ -255,8 +346,8 @@ def generate_ai_response(content, post_id=None, user_id=None):
 
 返信を作成してください。"""
 
-        logging.info("生成提示词完成，开始调用API")
-        logging.info(f"完整提示词内容:\n{prompt}")
+        log_info("生成提示词完成，开始调用API")
+        log_info(f"完整提示词内容:\n{prompt}")
         
         try:
             generation_config = {
@@ -272,14 +363,14 @@ def generate_ai_response(content, post_id=None, user_id=None):
                 raise AIResponseError("API返回空响应")
             
             ai_response = response.text.strip()
-            logging.info(f"AI回复生成成功: {ai_response}")
+            log_info(f"AI回复生成成功: {ai_response}")
             
             # 保存互动记录
             if user_id:
                 try:
                     # 分析情感
                     sentiment_score = analyze_sentiment(content)
-                    logging.info(f"情感分析得分: {sentiment_score}")
+                    log_info(f"情感分析得分: {sentiment_score}")
                     
                     # 保存记忆
                     memory = AIMemory(
@@ -295,23 +386,23 @@ def generate_ai_response(content, post_id=None, user_id=None):
                     if relationship:
                         old_affinity = relationship.affinity_score
                         relationship.adjust_affinity(sentiment_score)
-                        logging.info(f"更新亲密度: {old_affinity} -> {relationship.affinity_score}")
+                        log_info(f"更新亲密度: {old_affinity} -> {relationship.affinity_score}")
                     
                     db.session.commit()
-                    logging.info("成功保存互动记录和更新关系")
+                    log_info("成功保存互动记录和更新关系")
                 except Exception as e:
-                    logging.error(f"保存互动记录时出错: {str(e)}")
+                    log_error(f"保存互动记录时出错: {str(e)}")
                     db.session.rollback()
                     # 继续执行，不影响回复生成
             
             return ai_response
             
         except Exception as api_error:
-            logging.error(f"调用API时出错: {str(api_error)}")
+            log_error(f"调用API时出错: {str(api_error)}")
             raise AIResponseError("生成回复失败") from api_error
 
     except Exception as e:
-        logging.error(f"生成AI回复时出错: {str(e)}", exc_info=True)
+        log_error(f"生成AI回复时出错: {str(e)}", exc_info=True)
         if isinstance(e, (AIResponseError, DatabaseError)):
             raise
         raise AIResponseError("生成回复时发生未知错误") from e
@@ -369,7 +460,7 @@ def get_posts():
             'current_page': posts.page
         })
     except Exception as e:
-        logging.error(f"获取帖子列表时出错: {str(e)}")
+        log_error(f"获取帖子列表时出错: {str(e)}")
         return jsonify({'error': '投稿の取得に失敗しました'}), 500
 
 @forum_bp.route('/api/posts/<int:post_id>', methods=['GET'])
@@ -397,7 +488,7 @@ def get_post(post_id):
             } for tag in post.Post.tags]
         })
     except Exception as e:
-        logging.error(f"获取帖子详情时出错: {str(e)}")
+        log_error(f"获取帖子详情时出错: {str(e)}")
         return jsonify({'error': '投稿的詳細の取得に失敗しました'}), 500
 
 @forum_bp.route('/api/posts/<int:post_id>/comments', methods=['GET'])
@@ -421,7 +512,7 @@ def get_comments(post_id):
             'created_at': comment.Comment.created_at.strftime('%Y-%m-%d %H:%M:%S')
         } for comment in comments])
     except Exception as e:
-        logging.error(f"获取评论时出错: {str(e)}")
+        log_error(f"获取评论时出错: {str(e)}")
         return jsonify({'error': '获取评论失败'}), 500
 
 @forum_bp.route('/api/posts', methods=['POST'])
@@ -475,20 +566,20 @@ def create_post():
         })
     except Exception as e:
         db.session.rollback()
-        logging.error(f"创建帖子时出错: {str(e)}")
+        log_error(f"创建帖子时出错: {str(e)}")
         return jsonify({'error': '投稿的作成に失敗しました'}), 500
 
 def add_ai_response_with_app(app, post_id, content, user_id=None):
     """在应用上下文中添加 AI 回复"""
     if not app:
-        logging.error("应用上下文对象为空")
+        log_error("应用上下文对象为空")
         return False
         
     try:
         with app.app_context():
             return add_ai_response(post_id, content, user_id)
     except Exception as e:
-        logging.error(f"添加 AI 回复时出错: {str(e)}")
+        log_error(f"添加 AI 回复时出错: {str(e)}")
         return False
 
 @forum_bp.route('/api/posts/<int:post_id>/comments', methods=['POST'])
@@ -542,15 +633,15 @@ def create_comment(post_id):
                     daemon=True
                 )
                 thread.start()
-                logging.info(f"已启动 AI 回复线程，post_id: {post_id}")
+                log_info(f"已启动 AI 回复线程，post_id: {post_id}")
             except Exception as e:
-                logging.error(f"启动 AI 回复线程失败: {str(e)}")
+                log_error(f"启动 AI 回复线程失败: {str(e)}")
                 # 继续执行，不影响评论创建
         
         return jsonify(response_data)
     except Exception as e:
         db.session.rollback()
-        logging.error(f"创建评论时出错: {str(e)}")
+        log_error(f"创建评论时出错: {str(e)}")
         if isinstance(e, DatabaseError):
             return jsonify({'error': '数据库操作失败'}), 500
         return jsonify({'error': '创建评论失败'}), 500
@@ -587,7 +678,7 @@ def get_user_info(user_id):
             }
         })
     except Exception as e:
-        logging.error(f"获取用户信息时出错: {str(e)}")
+        log_error(f"获取用户信息时出错: {str(e)}")
         return jsonify({
             'success': False,
             'error': '获取用户信息失败'
@@ -618,7 +709,7 @@ def get_user_posts(user_id):
             'posts': posts_data
         })
     except Exception as e:
-        logging.error(f"获取用户帖子列表时出错: {str(e)}")
+        log_error(f"获取用户帖子列表时出错: {str(e)}")
         return jsonify({
             'success': False,
             'error': '获取用户帖子列表失败'
@@ -636,7 +727,7 @@ def get_tags():
             'color': tag.color
         } for tag in tags])
     except Exception as e:
-        logging.error(f"获取标签列表时出错: {str(e)}")
+        log_error(f"获取标签列表时出错: {str(e)}")
         return jsonify({'error': 'タグの取得に失敗しました'}), 500
 
 @forum_bp.route('/api/tags', methods=['POST'])
@@ -675,7 +766,7 @@ def create_tag_api():
         })
     except Exception as e:
         db.session.rollback()
-        logging.error(f"创建标签时出错: {str(e)}")
+        log_error(f"创建标签时出错: {str(e)}")
         return jsonify({'error': 'タグ的作成に失敗しました'}), 500 
 
 @forum_bp.route('/posts/<int:post_id>/comments', methods=['POST'])
@@ -703,7 +794,7 @@ def add_comment(post_id):
                 # 传递当前用户的 ID
                 add_ai_response(post_id, content, session['user_id'])
             except (AIResponseError, DatabaseError) as e:
-                logging.error(f"AI 回复生成失败: {str(e)}")
+                log_error(f"AI 回复生成失败: {str(e)}")
                 # 继续执行，不影响评论创建
 
         return jsonify({
@@ -712,7 +803,7 @@ def add_comment(post_id):
         })
     except Exception as e:
         db.session.rollback()
-        logging.error(f"添加评论时出错: {str(e)}")
+        log_error(f"添加评论时出错: {str(e)}")
         if isinstance(e, DatabaseError):
             return jsonify({'error': 'データベース操作に失敗しました'}), 500
         return jsonify({'error': 'コメントの追加に失敗しました'}), 500 
@@ -760,7 +851,7 @@ def index():
             search_query=search_query
         )
     except Exception as e:
-        logging.error(f"获取论坛首页时出错: {str(e)}")
+        log_error(f"获取论坛首页时出错: {str(e)}")
         return render_template('error.html', message='ページの読み込みに失敗しました')
 
 @forum_bp.route('/posts/new', methods=['GET', 'POST'])
@@ -798,7 +889,7 @@ def new_post():
             return redirect(url_for('forum.view_post', post_id=post.id))
         except Exception as e:
             db.session.rollback()
-            logging.error(f"创建帖子时出错: {str(e)}")
+            log_error(f"创建帖子时出错: {str(e)}")
             return jsonify({'error': '投稿的作成に失敗しました'}), 500
     
     # GET 请求，显示创建帖子的表单
@@ -812,7 +903,7 @@ def view_post(post_id):
         post = Post.query.get_or_404(post_id)
         return render_template('forum/post.html', post=post)
     except Exception as e:
-        logging.error(f"获取帖子详情时出错: {str(e)}")
+        log_error(f"获取帖子详情时出错: {str(e)}")
         return render_template('error.html', message='投稿的読み込みに失敗しました')
 
 @forum_bp.route('/posts/<int:post_id>/edit', methods=['GET', 'POST'])
@@ -848,7 +939,7 @@ def edit_post(post_id):
             return redirect(url_for('forum.view_post', post_id=post.id))
         except Exception as e:
             db.session.rollback()
-            logging.error(f"更新帖子时出错: {str(e)}")
+            log_error(f"更新帖子时出错: {str(e)}")
             return jsonify({'error': '投稿的更新に失敗しました'}), 500
     
     # GET 请求，显示编辑表单
@@ -872,7 +963,7 @@ def delete_post(post_id):
         return redirect(url_for('forum.index'))
     except Exception as e:
         db.session.rollback()
-        logging.error(f"删除帖子时出错: {str(e)}")
+        log_error(f"删除帖子时出错: {str(e)}")
         return jsonify({'error': '投稿的削除に失敗しました'}), 500
 
 @forum_bp.route('/comments/<int:comment_id>/delete', methods=['POST'])
@@ -893,7 +984,7 @@ def delete_comment(comment_id):
         return redirect(url_for('forum.view_post', post_id=post_id))
     except Exception as e:
         db.session.rollback()
-        logging.error(f"删除评论时出错: {str(e)}")
+        log_error(f"删除评论时出错: {str(e)}")
         return jsonify({'error': 'コメント的削除に失敗しました'}), 500
 
 @forum_bp.route('/tags/new', methods=['POST'])
@@ -922,7 +1013,7 @@ def create_tag():
         })
     except Exception as e:
         db.session.rollback()
-        logging.error(f"创建标签时出错: {str(e)}")
+        log_error(f"创建标签时出错: {str(e)}")
         return jsonify({'error': 'タグ的作成に失敗しました'}), 500
 
 @forum_bp.route('/tags/<int:tag_id>/delete', methods=['POST'])
@@ -937,7 +1028,7 @@ def delete_tag(tag_id):
         return jsonify({'message': 'タグを削除しました'})
     except Exception as e:
         db.session.rollback()
-        logging.error(f"删除标签时出错: {str(e)}")
+        log_error(f"删除标签时出错: {str(e)}")
         return jsonify({'error': 'タグ的削除に失敗しました'}), 500 
 
 @forum_bp.route('/momo')
@@ -983,5 +1074,5 @@ def momo_profile():
             avg_sentiment=round(float(avg_sentiment), 2)
         )
     except Exception as e:
-        logging.error(f"获取AI助手个人资料时出错: {str(e)}")
+        log_error(f"获取AI助手个人资料时出错: {str(e)}")
         return render_template('error.html', message='ページの読み込みに失敗しました') 
