@@ -249,27 +249,8 @@ class AIMemory(db.Model):
     user = db.relationship('User', backref=db.backref('ai_memories', lazy=True))
     post = db.relationship('Post', backref=db.backref('ai_memories', lazy=True))
 
-class AIRelationship(db.Model):
-    """AI助手与用户的关系数据模型"""
-    __tablename__ = 'ai_relationships'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    affinity_score = db.Column(db.Float, default=50.0)  # 亲密度分数，范围0-100
-    interaction_count = db.Column(db.Integer, default=0)  # 互动次数
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # 关联
-    user = db.relationship('User', backref=db.backref('ai_relationship', uselist=False, lazy=True))
-
-    def adjust_affinity(self, sentiment_score):
-        """根据情感分数调整亲密度"""
-        self.affinity_score = max(0, min(100, self.affinity_score + sentiment_score * 5))
-        self.interaction_count += 1
-
 class AIPersonality(db.Model):
-    """AI助手的人格设定数据模型"""
+    """AI助手的人格设定"""
     __tablename__ = 'ai_personality'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -280,4 +261,56 @@ class AIPersonality(db.Model):
     interests = db.Column(db.Text, nullable=False)
     communication_style = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class AIRelationship(db.Model):
+    """用户与AI助手的关系"""
+    __tablename__ = 'ai_relationships'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    affinity_score = db.Column(db.Float, default=30.0)  # 亲密度分数，范围0-100
+    interaction_count = db.Column(db.Integer, default=0)  # 互动次数
+    last_interaction_at = db.Column(db.DateTime)  # 最后互动时间
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 关联
+    user = db.relationship('User', backref=db.backref('ai_relationship', uselist=False))
+
+    def adjust_affinity(self, sentiment_score):
+        """根据情感分数调整亲密度"""
+        # 将情感分数（-1到1）映射到亲密度变化（-5到5）
+        affinity_change = sentiment_score * 5
+        
+        # 更新亲密度，确保在0-100范围内
+        self.affinity_score = max(0, min(100, self.affinity_score + affinity_change))
+
+class AIInteraction(db.Model):
+    """记录用户与AI的互动"""
+    __tablename__ = 'ai_interactions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)  # 用户的输入内容
+    response = db.Column(db.Text, nullable=False)  # AI的回复内容
+    sentiment_score = db.Column(db.Float)  # 情感分析分数
+    interaction_type = db.Column(db.String(50))  # 互动类型（例如：聊天、学习辅导等）
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # 关联
+    user = db.relationship('User', backref=db.backref('ai_interactions', lazy=True))
+
+class AffinityHistory(db.Model):
+    """记录亲密度变化历史"""
+    __tablename__ = 'affinity_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    old_score = db.Column(db.Float, nullable=False)  # 变化前的亲密度
+    new_score = db.Column(db.Float, nullable=False)  # 变化后的亲密度
+    change_reason = db.Column(db.String(200))  # 变化原因
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # 关联
+    user = db.relationship('User', backref=db.backref('affinity_history', lazy=True)) 
