@@ -1,8 +1,9 @@
 # Gunicorn 配置文件
 import multiprocessing
+import os
 
 # 绑定的 IP 和端口
-bind = "0.0.0.0:8000"
+bind = "0.0.0.0:5000"
 
 # 工作进程数
 workers = multiprocessing.cpu_count() * 2 + 1
@@ -19,4 +20,10 @@ worker_connections = 1000
 # 日志配置
 accesslog = "logs/access.log"
 errorlog = "logs/error.log"
-loglevel = "info" 
+loglevel = "info"
+
+# 允许处理大文件上传
+max_requests = 1000
+max_requests_jitter = 50
+timeout = 300
+keepalive = 5 
