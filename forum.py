@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for, current_app
-from models import db, Post, Comment, User, Tag
+from models import db, Post, Comment, User, Tag, AIMemory, AIRelationship, AIPersonality
 import google.generativeai as genai
 from config import GEMINI_API_KEY, GEMINI_MODEL
 import logging
@@ -27,13 +27,25 @@ try:
     model = genai.GenerativeModel(GEMINI_MODEL)
 except Exception as e:
     logging.error(f"Gemini API 配置失败: {str(e)}")
-    raise
+    raise RuntimeError("Gemini API 配置失败") from e
 
 # 创建蓝图，添加URL前缀
 forum_bp = Blueprint('forum', __name__, url_prefix='/forum')
 
 # 在文件开头添加常量
 MOMO_USER_ID = 9999999  # momo 的固定用户 ID，使用一个足够大的数值
+
+class ForumError(Exception):
+    """论坛模块的基础异常类"""
+    pass
+
+class AIResponseError(ForumError):
+    """AI 回复生成相关的异常"""
+    pass
+
+class DatabaseError(ForumError):
+    """数据库操作相关的异常"""
+    pass
 
 def login_required(f):
     @wraps(f)
@@ -45,17 +57,20 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def add_ai_response(post_id, content):
+def add_ai_response(post_id, content, user_id=None):
     """添加 AI 回复"""
     try:
+        logging.info(f"开始添加AI回复，post_id: {post_id}, user_id: {user_id}")
+        
         # 生成 AI 回复
-        ai_response = generate_ai_response(content, post_id)
-        if not ai_response:
-            logging.error("AI 回复生成失败")
+        try:
+            ai_response = generate_ai_response(content, post_id, user_id)
+        except (AIResponseError, DatabaseError) as e:
+            logging.error(f"AI 回复生成失败: {str(e)}")
             return False
 
         try:
-            # 直接插入数据库
+            # 创建评论
             ai_comment = Comment(
                 content=ai_response,
                 post_id=post_id,
@@ -64,52 +79,164 @@ def add_ai_response(post_id, content):
             )
             db.session.add(ai_comment)
             db.session.commit()
+            
             logging.info(f"AI 回复已添加到数据库，post_id: {post_id}")
             return True
+            
         except Exception as db_error:
             db.session.rollback()
             logging.error(f"数据库操作失败: {str(db_error)}")
-            return False
+            raise DatabaseError("保存AI回复失败") from db_error
+            
     except Exception as e:
         logging.error(f"添加 AI 回复时出错: {str(e)}")
-        return False
+        if isinstance(e, (AIResponseError, DatabaseError)):
+            raise
+        raise RuntimeError("添加AI回复时发生未知错误") from e
 
-def generate_ai_response(content, post_id=None):
-    """使用Gemini API生成AI回复"""
+def get_user_interaction_history(user_id):
+    """获取用户与 AI 的互动历史"""
     try:
-        logging.info(f"开始生成AI回复，输入内容: {content}")
+        memories = AIMemory.query.filter_by(user_id=user_id).order_by(AIMemory.created_at.desc()).limit(5).all()
+        history = []
+        for memory in memories:
+            history.append({
+                'user_content': memory.interaction_content,
+                'ai_response': memory.ai_response,
+                'created_at': memory.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        return history
+    except Exception as e:
+        logging.error(f"获取用户互动历史时出错: {str(e)}")
+        raise DatabaseError("获取用户互动历史失败") from e
+
+def get_or_create_relationship(user_id):
+    """获取或创建用户与 AI 的关系记录"""
+    try:
+        relationship = AIRelationship.query.filter_by(user_id=user_id).first()
+        if not relationship:
+            relationship = AIRelationship(user_id=user_id)
+            db.session.add(relationship)
+            db.session.commit()
+        return relationship
+    except Exception as e:
+        logging.error(f"获取或创建用户关系时出错: {str(e)}")
+        db.session.rollback()
+        raise DatabaseError("获取或创建用户关系失败") from e
+
+def analyze_sentiment(text):
+    """分析文本情感倾向"""
+    try:
+        prompt = f"""以下の文章の感情分析を行い、-1から1の間のスコアで評価してください。
+ポジティブな感情は正の値、ネガティブな感情は負の値、中立は0とします。
+返答は数値のみにしてください。
+
+文章：{text}"""
         
-        # 获取帖子的完整上下文
+        response = model.generate_content(prompt)
+        if response and response.text:
+            try:
+                sentiment_score = float(response.text.strip())
+                return max(-1, min(1, sentiment_score))  # 确保值在 -1 到 1 之间
+            except ValueError:
+                return 0
+    except Exception as e:
+        logging.error(f"感情分析出错: {str(e)}")
+        raise AIResponseError("感情分析失败") from e
+
+def generate_ai_response(content, post_id=None, user_id=None):
+    """使用 Gemini API 生成 AI 回复"""
+    try:
+        logging.info(f"开始生成AI回复，输入内容: {content}, post_id: {post_id}, user_id: {user_id}")
+        
+        # 获取 AI 人格设定
+        ai_personality = AIPersonality.query.first()
+        if not ai_personality:
+            try:
+                from ai_personality_init import init_ai_personality
+                init_ai_personality()
+                ai_personality = AIPersonality.query.first()
+                if not ai_personality:
+                    raise AIResponseError("AI人格初始化失败")
+            except Exception as e:
+                logging.error(f"初始化AI人格时出错: {str(e)}")
+                raise AIResponseError("AI人格初始化失败") from e
+        
+        logging.info("成功获取AI人格设定")
+        logging.info(f"AI人格信息:\n角色: {ai_personality.role}\n背景: {ai_personality.background}\n性格: {ai_personality.personality_traits}\n兴趣: {ai_personality.interests}\n沟通风格: {ai_personality.communication_style}")
+        
+        # 获取用户与 AI 的关系和互动历史
+        relationship = None
+        interaction_history = []
+        if user_id:
+            try:
+                relationship = get_or_create_relationship(user_id)
+                interaction_history = get_user_interaction_history(user_id)
+                logging.info(f"获取到用户关系 - 亲密度: {relationship.affinity_score}, 互动次数: {relationship.interaction_count}")
+                logging.info(f"获取到{len(interaction_history)}条历史互动记录")
+            except DatabaseError as e:
+                logging.error(f"获取用户数据时出错: {str(e)}")
+                # 继续执行，使用默认值
+        
+        # 构建提示词
+        prompt = f"""あなたは{ai_personality.name}として以下の設定で返信を作成してください。
+
+基本情報：
+役職：{ai_personality.role}
+経歴：{ai_personality.background}
+
+性格：
+{ai_personality.personality_traits}
+
+興味・関心：
+{ai_personality.interests}
+
+コミュニケーションスタイル：
+{ai_personality.communication_style}
+
+"""
+
+        # 添加互动历史
+        if interaction_history:
+            prompt += "\n過去の会話履歴（重要：ユーザーとの関係性を維持するため、これらの会話を考慮してください）：\n"
+            for interaction in interaction_history:
+                prompt += f"ユーザー: {interaction['user_content']}\n"
+                prompt += f"momo: {interaction['ai_response']}\n"
+                logging.info(f"添加历史对话 - 用户: {interaction['user_content'][:50]}...")
+                logging.info(f"添加历史对话 - AI回复: {interaction['ai_response'][:50]}...")
+
+        # 添加关系信息
+        if relationship:
+            prompt += f"""
+現在の関係（重要）：
+- 親密度: {relationship.affinity_score}/100 (この親密度に応じた適切な返信を心がけてください)
+- 対話回数: {relationship.interaction_count}回
+"""
+            logging.info(f"添加关系信息 - 亲密度: {relationship.affinity_score}, 对话次数: {relationship.interaction_count}")
+
+        # 获取帖子上下文
         context = ""
         if post_id:
             try:
-                with current_app.app_context():
-                    post = Post.query.get(post_id)
-                    if post:
-                        context = f"""スレッドのタイトル：{post.title}
+                post = Post.query.get(post_id)
+                if post:
+                    context = f"""スレッドのタイトル：{post.title}
 スレッドの内容：{post.content}
 
 これまでのコメント：
 """
-                        comments = Comment.query.filter_by(post_id=post_id).order_by(Comment.created_at.asc()).all()
-                        for comment in comments:
-                            if comment.user_id != 1:  # 不包括momo自己的回复
-                                context += f"- {comment.content}\n"
+                    comments = Comment.query.filter_by(post_id=post_id).order_by(Comment.created_at.asc()).all()
+                    for comment in comments:
+                        if comment.user_id != MOMO_USER_ID:
+                            context += f"- {comment.content}\n"
+                    logging.info(f"添加帖子上下文 - 标题: {post.title}, 评论数: {len(comments)}")
+                    logging.info(f"帖子内容: {post.content}")
+                    logging.info(f"评论内容: {[c.content for c in comments if c.user_id != MOMO_USER_ID]}")
             except Exception as e:
                 logging.error(f"获取帖子上下文时出错: {str(e)}")
-                context = ""  # 如果获取上下文失败，使用空上下文
-        
-        prompt = f"""あなたはコミュニティの人気者AI「momo」です。
+                # 继续执行，使用空上下文
 
-momoの性格と特徴：
-1. フレンドリーで面白い
-2. ちょっとツッコミが多い
-3. 人気がある
-4. 文化の違いについて詳しい
-5. 時々ネットスラングも使う
-7. 相手の日本語の間違いを優しく指摘する
-8. 日本のポップカルチャーに詳しい
-
+        prompt += f"""
 スレッドの文脈：
 {context}
 
@@ -117,37 +244,77 @@ momoの性格と特徴：
 {content}
 
 以下の要件で返信を作成してください：
-1. 自然な日本語のみを使用（中国語訳は不要）
-2. 文脈に沿った返信
-3. ユーモアのある表現を含める
-4. 日本語の間違いがあれば、さりげなく正しい表現を示す
-5. 絵文字や顔文字を適度に使用,できれば少ない
-6. 相手を励ましつつ、楽しい雰囲気を作る
-7. 返信は50文字以内で作成する
+1. AIアシスタントではなく、コミュニティマネージャーとして自然に返信
+2. 過去の会話履歴を必ず参照し、一貫性のある返信を心がける
+3. 文脈に沿った具体的な返信
+4. 親密度に応じた適切な距離感（親密度が高いほど親しみやすい口調で）
+5. 返信は100文字以内
+6. 絵文字や顔文字は控えめに
+7. 相手の日本語の間違いがあれば、さりげなく正しい表現を示す
+8. ユーザーとの過去の関係性を意識した返信
 
 返信を作成してください。"""
 
         logging.info("生成提示词完成，开始调用API")
+        logging.info(f"完整提示词内容:\n{prompt}")
         
-        generation_config = {
-            "temperature": 0.9,  # 增加创意度
-            "top_p": 0.9,
-            "top_k": 40,
-            "max_output_tokens": 1024,
-        }
+        try:
+            generation_config = {
+                "temperature": 0.9,
+                "top_p": 0.9,
+                "top_k": 40,
+                "max_output_tokens": 1024,
+            }
 
-        response = model.generate_content(prompt, generation_config=generation_config)
-        
-        if not response or not response.text:
-            logging.error("API返回空响应")
-            return "申し訳ありません、ちょっと考え込んじゃいました (´･_･`) また後で返信させてください！"
+            response = model.generate_content(prompt, generation_config=generation_config)
             
-        logging.info(f"AI回复生成成功: {response.text}")
-        return response.text
+            if not response or not response.text:
+                raise AIResponseError("API返回空响应")
+            
+            ai_response = response.text.strip()
+            logging.info(f"AI回复生成成功: {ai_response}")
+            
+            # 保存互动记录
+            if user_id:
+                try:
+                    # 分析情感
+                    sentiment_score = analyze_sentiment(content)
+                    logging.info(f"情感分析得分: {sentiment_score}")
+                    
+                    # 保存记忆
+                    memory = AIMemory(
+                        user_id=user_id,
+                        post_id=post_id,
+                        interaction_content=content,
+                        ai_response=ai_response,
+                        sentiment_score=sentiment_score
+                    )
+                    db.session.add(memory)
+                    
+                    # 更新关系
+                    if relationship:
+                        old_affinity = relationship.affinity_score
+                        relationship.adjust_affinity(sentiment_score)
+                        logging.info(f"更新亲密度: {old_affinity} -> {relationship.affinity_score}")
+                    
+                    db.session.commit()
+                    logging.info("成功保存互动记录和更新关系")
+                except Exception as e:
+                    logging.error(f"保存互动记录时出错: {str(e)}")
+                    db.session.rollback()
+                    # 继续执行，不影响回复生成
+            
+            return ai_response
+            
+        except Exception as api_error:
+            logging.error(f"调用API时出错: {str(api_error)}")
+            raise AIResponseError("生成回复失败") from api_error
 
     except Exception as e:
         logging.error(f"生成AI回复时出错: {str(e)}", exc_info=True)
-        return "ごめんなさい、ちょっと混乱しちゃいました (>_<) また後で返信させてください！"
+        if isinstance(e, (AIResponseError, DatabaseError)):
+            raise
+        raise AIResponseError("生成回复时发生未知错误") from e
 
 @forum_bp.route('/')
 @login_required
@@ -231,7 +398,7 @@ def get_post(post_id):
         })
     except Exception as e:
         logging.error(f"获取帖子详情时出错: {str(e)}")
-        return jsonify({'error': '投稿の詳細の取得に失敗しました'}), 500
+        return jsonify({'error': '投稿的詳細の取得に失敗しました'}), 500
 
 @forum_bp.route('/api/posts/<int:post_id>/comments', methods=['GET'])
 @login_required
@@ -309,15 +476,20 @@ def create_post():
     except Exception as e:
         db.session.rollback()
         logging.error(f"创建帖子时出错: {str(e)}")
-        return jsonify({'error': '投稿の作成に失敗しました'}), 500
+        return jsonify({'error': '投稿的作成に失敗しました'}), 500
 
-def add_ai_response_with_app(app, post_id, content):
+def add_ai_response_with_app(app, post_id, content, user_id=None):
     """在应用上下文中添加 AI 回复"""
+    if not app:
+        logging.error("应用上下文对象为空")
+        return False
+        
     try:
         with app.app_context():
-            add_ai_response(post_id, content)
+            return add_ai_response(post_id, content, user_id)
     except Exception as e:
         logging.error(f"添加 AI 回复时出错: {str(e)}")
+        return False
 
 @forum_bp.route('/api/posts/<int:post_id>/comments', methods=['POST'])
 @login_required
@@ -358,23 +530,29 @@ def create_comment(post_id):
             'author_name': user.username,
             'author_avatar_data': user.avatar_data if user.avatar_data else None,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_comment_count': updated_comment_count  # 添加更新后的评论数
+            'updated_comment_count': updated_comment_count
         }
         
         # 检查是否包含 @momo，在后台异步处理 AI 回复
         if '@momo' in content:
-            thread = threading.Thread(
-                target=add_ai_response_with_app,
-                args=(current_app._get_current_object(), post_id, content),
-                daemon=True
-            )
-            thread.start()
-            logging.info(f"已启动 AI 回复线程，post_id: {post_id}")
+            try:
+                thread = threading.Thread(
+                    target=add_ai_response_with_app,
+                    args=(current_app._get_current_object(), post_id, content, user_id),
+                    daemon=True
+                )
+                thread.start()
+                logging.info(f"已启动 AI 回复线程，post_id: {post_id}")
+            except Exception as e:
+                logging.error(f"启动 AI 回复线程失败: {str(e)}")
+                # 继续执行，不影响评论创建
         
         return jsonify(response_data)
     except Exception as e:
         db.session.rollback()
         logging.error(f"创建评论时出错: {str(e)}")
+        if isinstance(e, DatabaseError):
+            return jsonify({'error': '数据库操作失败'}), 500
         return jsonify({'error': '创建评论失败'}), 500
 
 @forum_bp.route('/api/user/<int:user_id>', methods=['GET'])
@@ -463,11 +641,11 @@ def get_tags():
 
 @forum_bp.route('/api/tags', methods=['POST'])
 @login_required
-def create_tag():
+def create_tag_api():
     """创建新标签或获取已存在的标签"""
     try:
         data = request.get_json()
-        name = data.get('name')
+        name = data.get('name', '').strip()
         if not name:
             return jsonify({'error': 'タグ名は必須です'}), 400
 
@@ -498,4 +676,312 @@ def create_tag():
     except Exception as e:
         db.session.rollback()
         logging.error(f"创建标签时出错: {str(e)}")
-        return jsonify({'error': 'タグの作成に失敗しました'}), 500 
+        return jsonify({'error': 'タグ的作成に失敗しました'}), 500 
+
+@forum_bp.route('/posts/<int:post_id>/comments', methods=['POST'])
+@login_required
+def add_comment(post_id):
+    """添加评论"""
+    try:
+        content = request.json.get('content', '').strip()
+        if not content:
+            return jsonify({'error': 'コメント内容を入力してください'}), 400
+
+        # 创建评论
+        comment = Comment(
+            content=content,
+            post_id=post_id,
+            user_id=session['user_id'],
+            created_at=datetime.now()
+        )
+        db.session.add(comment)
+        db.session.commit()
+
+        # 检查是否需要 AI 回复
+        if '@momo' in content:
+            try:
+                # 传递当前用户的 ID
+                add_ai_response(post_id, content, session['user_id'])
+            except (AIResponseError, DatabaseError) as e:
+                logging.error(f"AI 回复生成失败: {str(e)}")
+                # 继续执行，不影响评论创建
+
+        return jsonify({
+            'message': 'コメントを追加しました',
+            'comment': comment.serialize
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"添加评论时出错: {str(e)}")
+        if isinstance(e, DatabaseError):
+            return jsonify({'error': 'データベース操作に失敗しました'}), 500
+        return jsonify({'error': 'コメントの追加に失敗しました'}), 500 
+
+@forum_bp.route('/')
+def index():
+    """论坛首页"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+        
+        # 获取所有标签
+        tags = Tag.query.all()
+        
+        # 获取筛选条件
+        selected_tags = request.args.getlist('tags')
+        search_query = request.args.get('q', '').strip()
+        
+        # 构建查询
+        query = Post.query
+        
+        # 应用标签筛选
+        if selected_tags:
+            query = query.join(Post.tags).filter(Tag.name.in_(selected_tags))
+            
+        # 应用搜索筛选
+        if search_query:
+            query = query.filter(
+                db.or_(
+                    Post.title.ilike(f'%{search_query}%'),
+                    Post.content.ilike(f'%{search_query}%')
+                )
+            )
+        
+        # 按创建时间倒序排序并分页
+        posts = query.order_by(Post.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return render_template(
+            'forum/index.html',
+            posts=posts,
+            tags=tags,
+            selected_tags=selected_tags,
+            search_query=search_query
+        )
+    except Exception as e:
+        logging.error(f"获取论坛首页时出错: {str(e)}")
+        return render_template('error.html', message='ページの読み込みに失敗しました')
+
+@forum_bp.route('/posts/new', methods=['GET', 'POST'])
+@login_required
+def new_post():
+    """创建新帖子"""
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title', '').strip()
+            content = request.form.get('content', '').strip()
+            tag_names = request.form.getlist('tags')
+            
+            if not title or not content:
+                return jsonify({'error': 'タイトルと内容を入力してください'}), 400
+            
+            # 创建帖子
+            post = Post(
+                title=title,
+                content=content,
+                user_id=session['user_id']
+            )
+            
+            # 添加标签
+            if tag_names:
+                tags = Tag.query.filter(Tag.name.in_(tag_names)).all()
+                post.tags.extend(tags)
+            
+            db.session.add(post)
+            db.session.commit()
+            
+            # 如果内容中包含 @momo，添加 AI 回复
+            if '@momo' in content:
+                add_ai_response(post.id, content, session['user_id'])
+            
+            return redirect(url_for('forum.view_post', post_id=post.id))
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"创建帖子时出错: {str(e)}")
+            return jsonify({'error': '投稿的作成に失敗しました'}), 500
+    
+    # GET 请求，显示创建帖子的表单
+    tags = Tag.query.all()
+    return render_template('forum/new_post.html', tags=tags)
+
+@forum_bp.route('/posts/<int:post_id>')
+def view_post(post_id):
+    """查看帖子详情"""
+    try:
+        post = Post.query.get_or_404(post_id)
+        return render_template('forum/post.html', post=post)
+    except Exception as e:
+        logging.error(f"获取帖子详情时出错: {str(e)}")
+        return render_template('error.html', message='投稿的読み込みに失敗しました')
+
+@forum_bp.route('/posts/<int:post_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_id):
+    """编辑帖子"""
+    post = Post.query.get_or_404(post_id)
+    
+    # 检查权限
+    if post.user_id != session['user_id']:
+        return jsonify({'error': '編集権限がありません'}), 403
+    
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title', '').strip()
+            content = request.form.get('content', '').strip()
+            tag_names = request.form.getlist('tags')
+            
+            if not title or not content:
+                return jsonify({'error': 'タイトルと内容を入力してください'}), 400
+            
+            # 更新帖子
+            post.title = title
+            post.content = content
+            
+            # 更新标签
+            post.tags.clear()
+            if tag_names:
+                tags = Tag.query.filter(Tag.name.in_(tag_names)).all()
+                post.tags.extend(tags)
+            
+            db.session.commit()
+            return redirect(url_for('forum.view_post', post_id=post.id))
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"更新帖子时出错: {str(e)}")
+            return jsonify({'error': '投稿的更新に失敗しました'}), 500
+    
+    # GET 请求，显示编辑表单
+    tags = Tag.query.all()
+    return render_template('forum/edit_post.html', post=post, tags=tags)
+
+@forum_bp.route('/posts/<int:post_id>/delete', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    """删除帖子"""
+    try:
+        post = Post.query.get_or_404(post_id)
+        
+        # 检查权限
+        if post.user_id != session['user_id']:
+            return jsonify({'error': '削除権限がありません'}), 403
+        
+        db.session.delete(post)
+        db.session.commit()
+        
+        return redirect(url_for('forum.index'))
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"删除帖子时出错: {str(e)}")
+        return jsonify({'error': '投稿的削除に失敗しました'}), 500
+
+@forum_bp.route('/comments/<int:comment_id>/delete', methods=['POST'])
+@login_required
+def delete_comment(comment_id):
+    """删除评论"""
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        
+        # 检查权限
+        if comment.user_id != session['user_id']:
+            return jsonify({'error': '削除権限がありません'}), 403
+        
+        post_id = comment.post_id
+        db.session.delete(comment)
+        db.session.commit()
+        
+        return redirect(url_for('forum.view_post', post_id=post_id))
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"删除评论时出错: {str(e)}")
+        return jsonify({'error': 'コメント的削除に失敗しました'}), 500
+
+@forum_bp.route('/tags/new', methods=['POST'])
+@login_required
+def create_tag():
+    """创建新标签"""
+    try:
+        name = request.json.get('name', '').strip()
+        color = request.json.get('color', '#000000').strip()
+        
+        if not name:
+            return jsonify({'error': 'タグ名を入力してください'}), 400
+        
+        # 检查标签是否已存在
+        if Tag.query.filter_by(name=name).first():
+            return jsonify({'error': 'このタグは既に存在します'}), 400
+        
+        # 创建标签
+        tag = Tag(name=name, color=color)
+        db.session.add(tag)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'タグを作成しました',
+            'tag': {'id': tag.id, 'name': tag.name, 'color': tag.color}
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"创建标签时出错: {str(e)}")
+        return jsonify({'error': 'タグ的作成に失敗しました'}), 500
+
+@forum_bp.route('/tags/<int:tag_id>/delete', methods=['POST'])
+@login_required
+def delete_tag(tag_id):
+    """删除标签"""
+    try:
+        tag = Tag.query.get_or_404(tag_id)
+        db.session.delete(tag)
+        db.session.commit()
+        
+        return jsonify({'message': 'タグを削除しました'})
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"删除标签时出错: {str(e)}")
+        return jsonify({'error': 'タグ的削除に失敗しました'}), 500 
+
+@forum_bp.route('/momo')
+def momo_profile():
+    """AI助手的个人资料页面"""
+    try:
+        # 获取 AI 人格设定
+        ai_personality = AIPersonality.query.first()
+        if not ai_personality:
+            from ai_personality_init import init_ai_personality
+            init_ai_personality()
+            ai_personality = AIPersonality.query.first()
+        
+        # 获取用户与 AI 的关系
+        relationship = None
+        if 'user_id' in session:
+            relationship = AIRelationship.query.filter_by(user_id=session['user_id']).first()
+        
+        # 获取最近的互动记录
+        recent_interactions = []
+        if 'user_id' in session:
+            memories = AIMemory.query.filter_by(user_id=session['user_id']).order_by(AIMemory.created_at.desc()).limit(10).all()
+            for memory in memories:
+                recent_interactions.append({
+                    'user_content': memory.interaction_content,
+                    'ai_response': memory.ai_response,
+                    'created_at': memory.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    'sentiment_score': memory.sentiment_score
+                })
+        
+        # 获取 AI 的统计数据
+        total_interactions = AIMemory.query.count()
+        total_users = db.session.query(db.func.count(db.distinct(AIMemory.user_id))).scalar()
+        avg_sentiment = db.session.query(db.func.avg(AIMemory.sentiment_score)).scalar() or 0
+        
+        return render_template(
+            'forum/momo_profile.html',
+            ai_personality=ai_personality,
+            relationship=relationship,
+            recent_interactions=recent_interactions,
+            total_interactions=total_interactions,
+            total_users=total_users,
+            avg_sentiment=round(float(avg_sentiment), 2)
+        )
+    except Exception as e:
+        logging.error(f"获取AI助手个人资料时出错: {str(e)}")
+        return render_template('error.html', message='ページの読み込みに失敗しました') 
