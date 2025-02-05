@@ -3,26 +3,20 @@
 {% block content %}
 <div class="vocabulary-container" data-user-id="{{ current_user.id }}">
     <div class="category-preview">
-
         <div class="preview-buttons">
-            <button class="preview-category-btn active" data-category="n5">N5</button>
-            <button class="preview-category-btn" data-category="n4">N4</button>
-            <button class="preview-category-btn" data-category="n3">N3</button>
-            <button class="preview-category-btn" data-category="n2">N2</button>
-            <button class="preview-category-btn" data-category="n1">N1</button>
-            <button class="preview-category-btn" data-category="daily">日常用语</button>
-            <button class="preview-category-btn" data-category="business">商务用语</button>
+            <button class="preview-category-btn active" data-category="n1">JLPT N1 词汇</button>
+            <button class="preview-category-btn" data-category="n2">JLPT N2 词汇</button>
         </div>
     </div>
 
     <div class="start-section">
-        <button class="start-btn">学習を始める</button>
+        <button class="start-btn">开始学习</button>
     </div>
 
     <div class="main-content">
         <div class="loading-indicator">
             <div class="loading-spinner"></div>
-            <div class="status-message">単語を生成中...</div>
+            <div class="status-message">加载单词中...</div>
         </div>
 
         <div class="word-card">

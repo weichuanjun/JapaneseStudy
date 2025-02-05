@@ -1,10 +1,12 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 from models import db, VocabularyRecord, Vocabulary
+from sqlalchemy import text
 import json
 import logging
 import time
 import google.generativeai as genai
 from config import GEMINI_API_KEY, GEMINI_MODEL
+import random
 
 # 配置日志
 logging.basicConfig(
@@ -28,12 +30,7 @@ vocabulary_bp = Blueprint('vocabulary', __name__)
 
 CATEGORIES = {
     'n1': 'JLPT N1 词汇',
-    'n2': 'JLPT N2 词汇',
-    'n3': 'JLPT N3 词汇',
-    'n4': 'JLPT N4 词汇',
-    'n5': 'JLPT N5 词汇',
-    'daily': '日常用语',
-    'business': '商务用语'
+    'n2': 'JLPT N2 词汇'
 }
 
 def generate_word_prompt(category, performance=None):
@@ -192,7 +189,6 @@ def generate_word_with_gemini(prompt):
                     return None, error_msg
                     
                 # 随机选择一个单词
-                import random
                 word_data = random.choice(words_data)
                 logging.info(f"从 {len(words_data)} 个单词中随机选择了一个")
                 return word_data, None
@@ -210,17 +206,22 @@ def generate_word_with_gemini(prompt):
         logging.error(error_msg, exc_info=True)
         return None, error_msg
 
+@vocabulary_bp.route('/vocabulary')
+def vocabulary_page():
+    """渲染词汇学习页面"""
+    return render_template('vocabulary.html', categories=CATEGORIES)
+
 @vocabulary_bp.route('/api/vocabulary/word', methods=['POST'])
 def get_word():
     start_time = time.time()
-    logging.info("=== 开始新的单词生成请求 ===")
+    logging.info("=== 开始获取单词 ===")
     
     try:
         data = request.get_json()
         if not data:
             return jsonify({'error': 'No JSON data received'}), 400
             
-        category = data.get('category', 'n5')
+        category = data.get('category', 'n1')
         user_id = data.get('user_id')
         
         if not user_id:
@@ -244,37 +245,82 @@ def get_word():
         else:
             logging.info("未找到该类别的历史记录")
         
-        prompt = generate_word_prompt(category, performance)
-        logging.info("生成的提示: " + prompt)
+        # 从system_vocabulary表中随机获取一个单词
+        sql = text("""
+            SELECT word, reading, meaning, example, example_reading, example_meaning, category
+            FROM system_vocabulary
+            WHERE category = :category
+            ORDER BY RANDOM()
+            LIMIT 1
+        """)
         
-        # 最多尝试3次生成单词
-        max_attempts = 3
-        for attempt in range(max_attempts):
-            # 使用Gemini API生成单词
-            word_data, error = generate_word_with_gemini(prompt)
+        result = db.session.execute(sql, {'category': category}).first()
+        
+        if not result:
+            return jsonify({'error': 'No words available for this category'}), 404
             
-            if error:
-                if attempt == max_attempts - 1:
-                    return jsonify({'error': error}), 500
-                logging.warning(f"第 {attempt + 1} 次尝试失败，准备重试")
-                continue
-                
-            # 验证数据格式和内容
-            is_valid, error_message = validate_word_data(word_data)
-            if is_valid:
-                logging.info(f"成功解析单词数据: {json.dumps(word_data, ensure_ascii=False, indent=2)}")
-                end_time = time.time()
-                logging.info(f"=== 单词生成完成 耗时: {end_time - start_time:.2f}秒 ===")
-                return jsonify(word_data)
+        # 获取其他三个错误选项
+        wrong_options_sql = text("""
+            SELECT meaning 
+            FROM system_vocabulary 
+            WHERE category = :category 
+                AND word != :word 
+                AND meaning != :meaning
+            ORDER BY RANDOM() 
+            LIMIT 3
+        """)
+        
+        wrong_options = [row[0] for row in db.session.execute(
+            wrong_options_sql,
+            {
+                'category': category, 
+                'word': result.word,
+                'meaning': result.meaning
+            }
+        ).fetchall()]
+        
+        # 如果获取的错误选项不足3个，从其他类别补充
+        if len(wrong_options) < 3:
+            additional_options_sql = text("""
+                SELECT meaning 
+                FROM system_vocabulary 
+                WHERE meaning != :meaning
+                    AND word != :word
+                ORDER BY RANDOM() 
+                LIMIT :limit
+            """)
             
-            if attempt == max_attempts - 1:
-                return jsonify({'error': f'Invalid word data: {error_message}'}), 500
-            logging.warning(f"第 {attempt + 1} 次验证失败，准备重试")
+            additional_options = [row[0] for row in db.session.execute(
+                additional_options_sql,
+                {
+                    'meaning': result.meaning,
+                    'word': result.word,
+                    'limit': 3 - len(wrong_options)
+                }
+            ).fetchall()]
             
-        return jsonify({'error': 'Failed to generate valid word data after multiple attempts'}), 500
+            wrong_options.extend(additional_options)
+        
+        # 构建选项列表并随机打乱
+        options = [result.meaning] + wrong_options
+        random.shuffle(options)
+        
+        word_data = {
+            'word': result.word,
+            'reading': result.reading,
+            'meaning': result.meaning,
+            'options': options,
+            'example': result.example,
+            'example_reading': result.example_reading,
+            'example_meaning': result.example_meaning
+        }
+        
+        end_time = time.time()
+        logging.info(f"=== 单词获取完成 耗时: {end_time - start_time:.2f}秒 ===")
+        return jsonify(word_data)
             
     except Exception as e:
-        logging.error(f"处理请求时出错: {str(e)}", exc_info=True)
+        logging.error(f"处理请求时出错: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @vocabulary_bp.route('/api/vocabulary/record', methods=['POST'])
