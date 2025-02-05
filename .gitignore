@@ -64,3 +64,5 @@ migrations/
 *bak
 *.bak
 *.backup
+
+.env

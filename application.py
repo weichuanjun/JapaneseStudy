@@ -799,23 +799,20 @@ def get_topic_feedback(text, topic):
    - 文脈は一貫しているか
    - 要点を押さえているか
 
-以下の形式で出力してください。他の説明は一切不要です。
+以下の形式で出力してください：
 
 {{
-    "grammar_score": 評価点数,
-    "content_score": 評価点数,
-    "relevance_score": 評価点数,
-    "feedback": "【文法の修正】\n修正された文章と説明\n\n【評価とアドバイス】\n\n1. 文法面：\n   - 具体的な指摘\n\n2. 内容面：\n - 具体的な指摘\n\n3. 関連性：\n   - 具体的な指摘 n\n\4.例文：n\ -テーマに沿った内容で、自由に表現された修正版の文章 "
+    "grammar_score": 数値,
+    "content_score": 数値,
+    "relevance_score": 数値,
+    "feedback": "# 日本語スピーチ評価\\n\\n## 🎯 総合評価\\n- 総合的な印象と改善ポイントの概要\\n\\n## 📝 文法の修正と解説\\n### 修正された文章\\n```\\n（修正後の文章をここに記載）\\n```\\n\\n### 主な修正点\\n1. 助詞の使用\\n   - 具体的な修正箇所と説明\\n   - 正しい使い方の例示\\n\\n2. 文の構造\\n   - 構文の改善点\\n   - より自然な表現方法\\n\\n3. 時制・敬語\\n   - 時制の一貫性\\n   - 適切な敬語レベル\\n\\n## 💡 詳細アドバイス\\n### 1. 文法面\\n- 優れている点\\n  - 具体的な良い例の提示\\n- 改善点\\n  - 具体的な課題と改善方法\\n- 学習ポイント\\n  - 関連する文法規則の説明\\n  - 練習すべきポイント\\n\\n### 2. 内容面\\n- 優れている点\\n  - 効果的な表現・説明\\n- 改善点\\n  - より良い表現方法の提案\\n- 発展のヒント\\n  - 内容を充実させるためのアイデア\\n\\n### 3. テーマとの関連性\\n- テーマの理解度\\n- 論点の適切性\\n- 展開の一貫性\\n\\n## 📚 モデル例文\\n```\\n（テーマに沿った模範的な回答例）\\n```\\n\\n## 🔍 今後の学習ポイント\\n1. 重点的に学習すべき文法項目\\n2. 表現の幅を広げるためのアドバイス\\n3. 練習方法の提案\\n\\n## 💪 励ましのメッセージ\\n頑張りポイントを指摘し、継続的な学習への意欲を高めるメッセージ"
 }}
 
 注意事項：
-- 数値は0-100の整数で記入し、実際の評価を反映させること
-- feedbackは必ず"で囲む
-- feedbackは必ず番号付きの箇条書きで記入
+- 数値は0-100の整数で記入
+- feedbackは必ずエスケープされた文字列として記入
 - 余計な説明は一切加えない
 - 上記のJSONフォーマットを厳密に守る
--  \nをフォーマットに従って使用
-
 """
 
         generation_config = {
@@ -842,25 +839,20 @@ def get_topic_feedback(text, topic):
             import re
             
             # 1. 提取 JSON 对象
-            json_match = re.search(r'\{.*?\}', feedback_text, re.DOTALL)
+            json_match = re.search(r'\{.*\}', feedback_text, re.DOTALL)
             if not json_match:
                 logging.error("[Topic Feedback] 未找到JSON对象")
                 raise ValueError("JSON not found in response")
             
             json_str = json_match.group()
-            logging.info(f"[Topic Feedback] 提取的JSON字符串：{json_str}")
             
-            # 2. 清理JSON字符串
-            json_str = re.sub(r'\s+', ' ', json_str).strip()
-            json_str = re.sub(r'[「」『』【】、。，．]', '', json_str)
-            
-            # 3. 解析JSON
+            # 2. 解析JSON
             result = json.loads(json_str)
             
-            # 4. 验证和规范化结果
+            # 3. 验证和规范化结果
             for key in ["grammar_score", "content_score", "relevance_score"]:
                 if key in result:
-                    result[key] = max(0, min(100, int(result[key])))
+                    result[key] = max(0, min(100, int(float(str(result[key]).replace('数値', '0')))))
                 else:
                     result[key] = 0
                     
@@ -870,8 +862,8 @@ def get_topic_feedback(text, topic):
             logging.info(f"[Topic Feedback] 最终结果：{result}")
             return result
             
-        except (json.JSONDecodeError, ValueError) as e:
-            logging.error(f"[Topic Feedback] 解析反馈时出错: {str(e)}")
+        except json.JSONDecodeError as e:
+            logging.error(f"[Topic Feedback] JSON解析错误: {str(e)}")
             return {
                 "grammar_score": 0,
                 "content_score": 0,
@@ -1071,7 +1063,7 @@ def generate_practice_text():
 
         # 根据难度级别选择不同的提示词
         difficulty_prompts = {
-            'easy': """初級レベルの日本語学習者向けの練習文を生成してください。
+            'easy': """初級レベルの日本語学習者向けの練習文を生成してくだささい。
 - 基本的な語彙と文法（N5-N4レベル）を使用
 - 日常生活に関連する身近な内容
 - 短めの文章（30-50文字程度）
