@@ -8,8 +8,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    let currentCategory = 'n1';
     let currentWord = null;
-    let selectedCategory = 'n5';
 
     // 元素引用
     const startButton = document.querySelector('.start-btn');
@@ -27,30 +27,19 @@ document.addEventListener('DOMContentLoaded', function () {
     loadHistory();
     loadStats();
 
-    // 事件监听器
+    // 初始化类别按钮
     document.querySelectorAll('.preview-category-btn').forEach(button => {
         button.addEventListener('click', function () {
             document.querySelectorAll('.preview-category-btn').forEach(btn => btn.classList.remove('active'));
             this.classList.add('active');
-            selectedCategory = this.dataset.category;
+            currentCategory = this.dataset.category;
         });
     });
 
+    // 开始学习按钮
     startButton.addEventListener('click', () => {
-        showLoading('学習を準備中...');
-        loadStats()
-            .then(() => {
-                startButton.style.display = 'none';
-                mainContent.style.display = 'block';
-                loadNewWord();
-            })
-            .catch(error => {
-                showError('学習の開始に失敗しました: ' + error.message);
-            });
-    });
-
-    nextButton.addEventListener('click', () => {
-        loadNewWord();
+        showLoading(true);
+        loadWord();
     });
 
     // 单词本相关事件
@@ -75,18 +64,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // API 调用函数
-    async function loadNewWord() {
-        showLoading('単語を生成中...');
+    // 加载单词
+    async function loadWord() {
         try {
+            showLoading(true);
+
             const response = await fetch('/api/vocabulary/word', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    user_id: userId,
-                    category: selectedCategory
+                    category: currentCategory,
+                    user_id: userId
                 })
             });
 
@@ -94,21 +84,83 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error('Failed to load word');
             }
 
-            const data = await response.json();
-            currentWord = data;
-            displayWord(data);
-            loadingIndicator.style.display = 'none';
-            wordCard.style.display = 'block';
+            currentWord = await response.json();
+            displayWord(currentWord);
 
         } catch (error) {
             console.error('Error loading word:', error);
-            showError('単語の読み込みに失敗しました');
+            showMessage('加载单词失败，请重试');
+        } finally {
+            showLoading(false);
         }
     }
 
-    async function recordAnswer(isCorrect) {
+    // 显示单词
+    function displayWord(wordData) {
+        wordCard.style.display = 'block';
+
+        // 设置单词和读音
+        wordCard.querySelector('.word').textContent = wordData.word;
+        wordCard.querySelector('.reading').textContent = wordData.reading;
+
+        // 清除旧的选项
+        const optionsContainer = wordCard.querySelector('.options');
+        optionsContainer.innerHTML = '';
+
+        // 添加新选项
+        wordData.options.forEach(option => {
+            const button = document.createElement('button');
+            button.className = 'option-btn';
+            button.textContent = option;
+            button.addEventListener('click', () => checkAnswer(option));
+            optionsContainer.appendChild(button);
+        });
+
+        // 隐藏示例和下一个按钮
+        wordCard.querySelector('.example-section').style.display = 'none';
+        wordCard.querySelector('.next-btn').style.display = 'none';
+        wordCard.querySelector('.result-message').textContent = '';
+
+        // 检查单词是否已收藏
+        checkIfFavorited(wordData);
+    }
+
+    // 检查答案
+    async function checkAnswer(selectedOption) {
+        const isCorrect = selectedOption === currentWord.meaning;
+        const wordCard = document.querySelector('.word-card');
+
+        // 禁用所有选项
+        const buttons = wordCard.querySelectorAll('.option-btn');
+        buttons.forEach(button => {
+            button.disabled = true;
+            if (button.textContent === currentWord.meaning) {
+                button.classList.add('correct');
+            } else if (button.textContent === selectedOption && !isCorrect) {
+                button.classList.add('incorrect');
+            }
+        });
+
+        // 显示结果消息
+        const resultMessage = wordCard.querySelector('.result-message');
+        resultMessage.textContent = isCorrect ? '正确！' : '错误！';
+        resultMessage.className = 'result-message ' + (isCorrect ? 'correct' : 'incorrect');
+
+        // 显示示例句子
+        const exampleSection = wordCard.querySelector('.example-section');
+        exampleSection.style.display = 'block';
+        exampleSection.querySelector('.example').textContent = currentWord.example;
+        exampleSection.querySelector('.example-reading').textContent = currentWord.example_reading;
+        exampleSection.querySelector('.example-meaning').textContent = currentWord.example_meaning;
+
+        // 显示下一个按钮
+        const nextButton = wordCard.querySelector('.next-btn');
+        nextButton.style.display = 'block';
+        nextButton.onclick = loadWord;
+
+        // 记录答案
         try {
-            const response = await fetch('/api/vocabulary/record', {
+            await fetch('/api/vocabulary/record', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -116,21 +168,34 @@ document.addEventListener('DOMContentLoaded', function () {
                 body: JSON.stringify({
                     user_id: userId,
                     word: currentWord.word,
-                    category: selectedCategory,
+                    category: currentCategory,
                     is_correct: isCorrect
                 })
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to record answer');
-            }
-
-            loadStats();
-            loadHistory();
+            // 更新历史记录
+            addToHistory(currentWord.word, currentWord.meaning, isCorrect);
 
         } catch (error) {
             console.error('Error recording answer:', error);
         }
+    }
+
+    // 添加到历史记录
+    function addToHistory(word, meaning, isCorrect) {
+        const historyList = document.querySelector('.history-list');
+        const historyItem = document.createElement('div');
+        historyItem.className = 'history-item';
+        historyItem.innerHTML = `
+            <div class="word-info">
+                <span class="word-text">${word}</span>
+                <span class="word-meaning">${meaning}</span>
+            </div>
+            <span class="result ${isCorrect ? 'correct' : 'incorrect'}">
+                ${isCorrect ? '✓' : '✗'}
+            </span>
+        `;
+        historyList.insertBefore(historyItem, historyList.firstChild);
     }
 
     async function loadStats() {
@@ -187,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     example: word.example,
                     example_reading: word.example_reading,
                     example_meaning: word.example_meaning,
-                    category: selectedCategory
+                    category: currentCategory
                 })
             });
 
@@ -197,15 +262,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const result = await response.json();
             if (result.status === 'success') {
-                showMessage('単語を単語帳に追加しました');
+                showMessage('单词已添加到单词本');
                 favoriteBtn.classList.add('active');
             } else if (result.status === 'already exists') {
-                showMessage('この単語は既に単語帳にあります');
+                showMessage('该单词已存在于单词本');
             }
 
         } catch (error) {
             console.error('Error adding to favorites:', error);
-            showError('単語帳への追加に失敗しました');
+            showError('添加到单词本失败');
         }
     }
 
@@ -221,41 +286,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const result = await response.json();
             if (result.status === 'success') {
-                showMessage('単語を単語帳から削除しました');
+                showMessage('单词已从单词本中删除');
                 favoriteBtn.classList.remove('active');
             }
 
         } catch (error) {
             console.error('Error removing from favorites:', error);
-            showError('単語帳からの削除に失敗しました');
+            showError('从单词本中删除失败');
         }
-    }
-
-    // UI 更新函数
-    function displayWord(word) {
-        document.querySelector('.word').textContent = word.word;
-        document.querySelector('.reading').textContent = word.reading;
-
-        const optionsContainer = document.querySelector('.options');
-        optionsContainer.innerHTML = '';
-
-        // 随机排序选项
-        const shuffledOptions = shuffleArray([...word.options]);
-        shuffledOptions.forEach(option => {
-            const button = document.createElement('button');
-            button.className = 'option-btn';
-            button.textContent = option;
-            button.addEventListener('click', () => handleAnswer(option === word.meaning));
-            optionsContainer.appendChild(button);
-        });
-
-        // 隐藏例句和下一个按钮
-        document.querySelector('.example-section').style.display = 'none';
-        document.querySelector('.next-btn').style.display = 'none';
-        document.querySelector('.result-message').textContent = '';
-
-        // 检查单词是否已收藏
-        checkIfFavorited(word);
     }
 
     async function checkIfFavorited(word) {
@@ -270,31 +308,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Error checking favorites:', error);
         }
-    }
-
-    function handleAnswer(isCorrect) {
-        const options = document.querySelectorAll('.option-btn');
-        options.forEach(button => {
-            button.disabled = true;
-            if (button.textContent === currentWord.meaning) {
-                button.classList.add('correct');
-            } else if (!isCorrect && button.textContent === currentWord.meaning) {
-                button.classList.add('incorrect');
-            }
-        });
-
-        recordAnswer(isCorrect);
-
-        const resultMessage = document.querySelector('.result-message');
-        resultMessage.textContent = isCorrect ? '正解です！' : '不正解です。';
-        resultMessage.className = `result-message ${isCorrect ? 'correct' : 'incorrect'}`;
-
-        // 显示例句和下一个按钮
-        document.querySelector('.example-section').style.display = 'block';
-        document.querySelector('.example').textContent = currentWord.example;
-        document.querySelector('.example-reading').textContent = currentWord.example_reading;
-        document.querySelector('.example-meaning').textContent = currentWord.example_meaning;
-        document.querySelector('.next-btn').style.display = 'block';
     }
 
     function displayHistory(history) {
@@ -378,13 +391,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 辅助函数
-    function showLoading(message) {
-        loadingIndicator.style.display = 'flex';
-        loadingIndicator.style.flexDirection = 'column';
-        loadingIndicator.style.alignItems = 'center';
-        document.querySelector('.status-message').textContent = message;
-        wordCard.style.display = 'none';
+    // 显示/隐藏加载指示器
+    function showLoading(show) {
+        loadingIndicator.style.display = show ? 'block' : 'none';
+        wordCard.style.display = show ? 'none' : 'block';
     }
 
     function showError(message) {
@@ -406,11 +416,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 3000);
     }
 
-    function shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
+    function updateStats(stats) {
+        // 实现更新统计信息的逻辑
     }
 }); 
