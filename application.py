@@ -8,7 +8,7 @@ import azure.cognitiveservices.speech as speechsdk
 import logging
 import google.generativeai as genai
 from flask_migrate import Migrate
-from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE, GEMINI_API_KEY, GEMINI_MODEL
+from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE, GEMINI_API_KEY, GEMINI_MODEL, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS, SQLALCHEMY_ENGINE_OPTIONS
 from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash, g
 from models import db, User, ReadingRecord, TopicRecord
 from functools import wraps
@@ -26,14 +26,11 @@ from io import BytesIO
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///japanese_study.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'connect_args': {
-        'timeout': 30,
-        'check_same_thread': False
-    }
-}
+
+# 使用 config.py 中的数据库配置
+app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = SQLALCHEMY_ENGINE_OPTIONS
 
 # CSRF 保护配置
 app.config['WTF_CSRF_ENABLED'] = False  # 暂时禁用 CSRF 保护
@@ -46,17 +43,13 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads/avatars')
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # 初始化数据库
-db = SQLAlchemy(app)
+db.init_app(app)
 migrate = Migrate(app, db)
 
 # 注册蓝图
 app.register_blueprint(vocabulary_bp)
 app.register_blueprint(forum_bp)
 app.register_blueprint(profile_bp)
-
-# 创建数据库表
-with app.app_context():
-    db.create_all()
 
 # 登录验证装饰器
 def login_required(f):

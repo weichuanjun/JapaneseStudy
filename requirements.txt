@@ -12,6 +12,7 @@ itsdangerous==2.2.0
 SQLAlchemy==1.4.23
 alembic==1.14.0
 greenlet==3.1.1
+psycopg2-binary==2.9.9  # PostgreSQL driver
 
 # Azure Speech Services
 azure-cognitiveservices-speech==1.31.0
