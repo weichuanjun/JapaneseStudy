@@ -76,4 +76,7 @@ migrations/
 *.bak
 *.backup
 
-.env
+# 环境变量文件
+.env.*
+env.json
+*.env
