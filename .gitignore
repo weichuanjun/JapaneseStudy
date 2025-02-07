@@ -26,10 +26,21 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+.env.development
+bk/
 
 # 虚拟环境
 venv/
 ENV/
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# Environment Variables
+.env
+.env.prod
+.env.local
 
 # IDE
 .idea/

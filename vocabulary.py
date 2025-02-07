@@ -7,14 +7,14 @@ import time
 import google.generativeai as genai
 from config import GEMINI_API_KEY, GEMINI_MODEL
 import random
+import sys
 
-# 配置日志
+# 设置日志
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('vocabulary.log'),
-        logging.StreamHandler()
+        logging.StreamHandler(sys.stdout),  # 改用 StreamHandler
     ]
 )
 

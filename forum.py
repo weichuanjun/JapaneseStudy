@@ -11,6 +11,7 @@ import queue
 import random
 from sqlalchemy.orm import scoped_session, sessionmaker
 import os
+import sys
 
 # 确保logs目录存在
 if not os.path.exists('logs'):
@@ -20,8 +21,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler('logs/forum.log', encoding='utf-8'),
-        logging.StreamHandler()
+        logging.StreamHandler(sys.stdout)
     ]
 )
 
