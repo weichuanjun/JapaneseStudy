@@ -119,6 +119,21 @@ if [ -z "$CLOUDFRONT_DOMAIN" ]; then
     exit 1
 fi
 
+# 获取数据库信息
+DB_HOST=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`DbEndpoint`].OutputValue' --output text 2>/dev/null)
+DB_PORT=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs[?OutputKey==`DbPort`].OutputValue' --output text 2>/dev/null)
+
+# 更新 .env.prod 文件
+echo "更新环境变量配置..."
+sed -i.bak \
+    -e "s|DB_HOST_PLACEHOLDER|$DB_HOST|g" \
+    -e "s|CLOUDFRONT_URL_PLACEHOLDER|$CLOUDFRONT_DOMAIN|g" \
+    -e "s|CLOUDFRONT_DOMAIN_PLACEHOLDER|$CLOUDFRONT_DOMAIN|g" \
+    .env.prod
+
+# 删除备份文件
+rm -f .env.prod.bak
+
 # 上传静态文件
 if [ -d "static" ]; then
     echo "上传静态文件到 S3..."
@@ -133,11 +148,25 @@ fi
 
 # 上传模板文件
 if [ -d "templates" ]; then
-    echo "上传模板文件..."
-    aws s3 sync templates/ s3://$S3_BUCKET/templates/ --delete >/dev/null 2>&1 || {
+    echo "上传模板文件到 S3..."
+    aws s3 sync templates/ s3://$S3_BUCKET/templates/ \
+        --content-type "text/html; charset=utf-8" \
+        --cache-control "no-cache, no-store, must-revalidate" \
+        --delete >/dev/null 2>&1 || {
         echo "模板文件上传失败"
         exit 1
     }
+    
+    # 复制 index.html 到根目录
+    echo "复制 index.html 到 S3 根目录..."
+    aws s3 cp templates/index.html s3://$S3_BUCKET/index.html \
+        --content-type "text/html; charset=utf-8" \
+        --cache-control "no-cache, no-store, must-revalidate" \
+        >/dev/null 2>&1 || {
+        echo "index.html 复制失败"
+        exit 1
+    }
+    
     echo "模板文件上传成功"
 else
     echo "警告：templates 目录不存在，跳过上传"

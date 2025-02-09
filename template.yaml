@@ -25,11 +25,16 @@ Parameters:
   DBUsername:
     Type: String
     NoEcho: true
+    Default: dbadmin
     Description: 数据库用户名
   # 数据库密码参数（安全考虑，不会在控制台显示）
   DBPassword:
     Type: String
     NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: '[a-zA-Z0-9!@#$%^&*()_+=-]*'
+    ConstraintDescription: '密码必须包含8-41个字符，可以包含字母、数字和特殊字符'
     Description: 数据库密码
 
 # 全局配置，适用于所有 Lambda 函数
@@ -86,63 +91,89 @@ Resources:
           - "migrations/**"
           - "venv/**"
           - ".DS_Store"
+          - "*.log"
+          - ".dump"
+          - ".sql"
         Include:             # 包含的文件
-          - "templates/**"
-          - "static/**"
-          - ".env.prod"
+          - "templates/**"   # 模板文件
+          - "static/**"      # 静态文件
+          - ".env.prod"      # 生产环境配置
+          - "application.py" # 主应用文件
+          - "lambda_handler.py" # Lambda 处理函数
+          - "models.py"      # 数据模型
+          - "config.py"      # 配置文件
+          - "vocabulary.py"  # 词汇相关
+          - "forum.py"       # 论坛相关
+          - "profile.py"     # 用户档案相关
+          - "ai_advisor.py"  # AI 顾问相关
+          - "requirements.txt" # 依赖文件
     Properties:
-      FunctionName: !Sub ${ProjectName}-${Environment}-api  # 函数名称
-      CodeUri: ./            # 代码位置
-      Handler: lambda_handler.handler  # 处理函数
-      Layers:               # Lambda 层配置
+      FunctionName: !Sub ${ProjectName}-${Environment}-api
+      CodeUri: ./
+      Handler: lambda_handler.handler
+      Layers:
         - !Sub "arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:16"
-      Events:               # API Gateway 事件配置
-        RootPath:          # 根路径配置
-          Type: Api
-          Properties:
-            Path: /
-            Method: ANY
-        ProxyPath:         # 代理路径配置
-          Type: Api
-          Properties:
-            Path: /{proxy+}
-            Method: ANY
-      VpcConfig:           # VPC 配置
+      VpcConfig:
         SecurityGroupIds:
           - !Ref ApiSecurityGroup
         SubnetIds:
           - !Ref PrivateSubnet1
           - !Ref PrivateSubnet2
-      Policies:            # IAM 策略配置
+      Policies:
         - AWSLambdaVPCAccessExecutionRole
         - AWSLambdaBasicExecutionRole
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
-              Action:      # S3 操作权限
+              Action:
                 - s3:GetObject
                 - s3:ListBucket
                 - s3:PutObject
                 - s3:DeleteObject
-              Resource:    # S3 资源访问控制
+              Resource:
                 - !Sub ${StaticBucket.Arn}
                 - !Sub ${StaticBucket.Arn}/*
+                - !Sub ${StaticBucket.Arn}/templates/*
+                - !Sub ${StaticBucket.Arn}/static/*
             - Effect: Allow
-              Action: execute-api:Invoke
+              Action: 
+                - execute-api:Invoke
+                - execute-api:ManageConnections
               Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/*/*
-      Tags:               # 资源标签
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                - logs:DescribeLogStreams
+              Resource: 
+                - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-${Environment}-api:*
+            - Effect: Allow
+              Action:
+                - xray:PutTraceSegments
+                - xray:PutTelemetryRecords
+              Resource: "*"
+      Tags:
         Name: !Sub ${ProjectName}-${Environment}-api
         Function: api-handler
-      Environment:        # 环境变量
+      Environment:
         Variables:
+          FLASK_APP: application.py
+          FLASK_ENV: !Ref Environment
+          S3_BUCKET: !Ref StaticBucket
+          CLOUDFRONT_DOMAIN: !Sub https://${StaticDistribution.DomainName}
+          API_GATEWAY_ID: !Ref ApiGateway
+          REGION: !Ref "AWS::Region"
           POSTGRES_HOST: !GetAtt DbCluster.Endpoint.Address
           POSTGRES_PORT: !GetAtt DbCluster.Endpoint.Port
           POSTGRES_DB: !Ref DBName
           POSTGRES_USER: !Ref DBUsername
           POSTGRES_PASSWORD: !Ref DBPassword
-          S3_BUCKET: !Ref StaticBucket
-          CLOUDFRONT_DOMAIN: !Sub https://${StaticDistribution.DomainName}
           TEMPLATES_PATH: /var/task/templates
+      Tracing: Active
+      AutoPublishAlias: live
+      DeploymentPreference:
+        Type: Linear10PercentEvery1Minute
 
   # VPC 网络配置
   MainVPC:
@@ -325,7 +356,6 @@ Resources:
   # Aurora PostgreSQL 数据库集群配置
   DbCluster:
     Type: AWS::RDS::DBCluster
-    DeletionPolicy: Retain      # 保留策略：防止意外删除
     Properties:
       DBClusterIdentifier: !Sub ${ProjectName}-${Environment}-db
       Engine: aurora-postgresql
@@ -343,7 +373,7 @@ Resources:
       BackupRetentionPeriod: 7  # 备份保留期
       PreferredBackupWindow: 03:00-04:00
       PreferredMaintenanceWindow: Mon:04:00-Mon:05:00
-      DeletionProtection: true  # 删除保护
+      DeletionProtection: false  # 修改为 false，允许删除
       EnableHttpEndpoint: true
       Port: 5432
       Tags:
@@ -392,7 +422,6 @@ Resources:
   # S3 存储桶配置
   StaticBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
     Properties:
       BucketName: !Sub ${ProjectName}-${Environment}-static
       PublicAccessBlockConfiguration:  # 阻止公共访问配置
@@ -422,57 +451,91 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Enabled: true
         CustomErrorResponses:    # 自定义错误响应
           - ErrorCode: 403
-            ResponsePagePath: /template/index.html
+            ResponsePagePath: /index.html
             ResponseCode: 200
             ErrorCachingMinTTL: 300
           - ErrorCode: 404
-            ResponsePagePath: /template/index.html
+            ResponsePagePath: /index.html
             ResponseCode: 200
             ErrorCachingMinTTL: 300
         Origins:                # 源配置
           - DomainName: !GetAtt StaticBucket.RegionalDomainName
             Id: S3Origin
-            OriginPath: "/template"
             S3OriginConfig:
               OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${StaticOriginAccessIdentity}
-          - DomainName: !Sub ${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com
-            Id: ApiGatewayOrigin
+          - DomainName: !Sub ${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com
+            Id: ApiOrigin
+            OriginPath: /Prod
             CustomOriginConfig:
-              HTTPPort: 80
               HTTPSPort: 443
               OriginProtocolPolicy: https-only
               OriginSSLProtocols: [TLSv1.2]
         DefaultCacheBehavior:   # 默认缓存行为
-          TargetOriginId: S3Origin
+          TargetOriginId: ApiOrigin
           ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods: [GET, HEAD, OPTIONS]
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
           CachedMethods: [GET, HEAD]
           Compress: true
-          DefaultTTL: 86400
-          MaxTTL: 31536000
-          MinTTL: 3600
-          SmoothStreaming: false
+          DefaultTTL: 0
+          MinTTL: 0
+          MaxTTL: 0
           ForwardedValues:
-            QueryString: false
-            Cookies: { Forward: none }
+            QueryString: true
+            Cookies:
+              Forward: all
+            Headers:
+              - Accept
+              - Authorization
+              - Origin
+              - Referer
+              - X-CSRFToken
+              - X-Forwarded-For
+              - X-Forwarded-Proto
+              - Host
+              - Access-Control-Request-Headers
+              - Access-Control-Request-Method
         CacheBehaviors:         # 自定义缓存行为
-          - PathPattern: /api/*
-            TargetOriginId: ApiGatewayOrigin
-            ViewerProtocolPolicy: redirect-to-https
-            AllowedMethods: ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-            CachedMethods: ["GET", "HEAD", "OPTIONS"]
-            DefaultTTL: 0
-            ForwardedValues:
-              QueryString: true
-              Cookies: { Forward: all }
-              Headers: ["*"]
           - PathPattern: /static/*
             TargetOriginId: S3Origin
             ViewerProtocolPolicy: redirect-to-https
             AllowedMethods: [GET, HEAD, OPTIONS]
             DefaultTTL: 86400
+            MinTTL: 0
+            MaxTTL: 86400
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+          - PathPattern: /templates/*
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            DefaultTTL: 0
+            MinTTL: 0
+            MaxTTL: 0
+            ForwardedValues:
+              QueryString: true
+              Cookies:
+                Forward: none
+            ResponseHeadersPolicyId: !Ref TemplatesHeadersPolicy
+
+  TemplatesHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub ${ProjectName}-${Environment}-templates-headers
+        Comment: Headers policy for template files
+        CustomHeadersConfig:
+          Items:
+            - Header: Content-Type
+              Value: text/html; charset=utf-8
+              Override: true
+            - Header: Cache-Control
+              Value: no-cache, no-store, must-revalidate
+              Override: true
 
   # S3 存储桶策略配置
   StaticBucketPolicy:
@@ -488,8 +551,207 @@ Resources:
             Action: s3:GetObject
             Resource: 
               - !Sub ${StaticBucket.Arn}/*
-              - !Sub ${StaticBucket.Arn}/template/*
-              - !Sub ${StaticBucket.Arn}/template/index.html
+              - !Sub ${StaticBucket.Arn}/templates/*
+              - !Sub ${StaticBucket.Arn}/static/*
+
+  # API Gateway 配置
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub ${ProjectName}-${Environment}
+      Description: API Gateway for Japanese Study application
+      EndpointConfiguration:
+        Types: [REGIONAL]
+      BinaryMediaTypes:
+        - '*/*'
+      MinimumCompressionSize: 0
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    DependsOn: ApiGatewayAccount
+    Properties:
+      RestApiId: !Ref ApiGateway
+      DeploymentId: !Ref ApiGatewayDeployment
+      StageName: Prod
+      Variables:
+        lambdaAlias: live
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
+
+  ApiGatewayCloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+  # API Gateway 部署配置
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiGatewayOptionsMethod
+      - ApiGatewayProxyOptionsMethod
+      - ApiGatewayProxyMethod
+      - ApiGatewayRootMethod
+    Properties:
+      RestApiId: !Ref ApiGateway
+      Description: 'API Gateway deployment for Japanese Study application'
+
+  # API Gateway 代理资源配置
+  ApiGatewayProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: '{proxy+}'
+
+  # API Gateway 代理方法配置
+  ApiGatewayProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiGatewayProxyResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiFunction.Arn}/invocations
+      RequestParameters:
+        method.request.path.proxy: true
+
+  # API Gateway 根路径方法配置
+  ApiGatewayRootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !GetAtt ApiGateway.RootResourceId
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiFunction.Arn}/invocations
+
+  # Lambda 权限配置
+  ApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/*
+
+  # Lambda 版本权限
+  ApiGatewayPermissionLive:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiFunction.Alias
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/*
+
+  # API Gateway OPTIONS 方法配置
+  ApiGatewayOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-CSRFToken,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Credentials: "'true'"
+              method.response.header.Access-Control-Max-Age: "'600'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Max-Age: true
+          ResponseModels:
+            application/json: 'Empty'
+      ResourceId: !GetAtt ApiGateway.RootResourceId
+      RestApiId: !Ref ApiGateway
+
+  # API Gateway Proxy OPTIONS 方法配置
+  ApiGatewayProxyOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-CSRFToken,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Credentials: "'true'"
+              method.response.header.Access-Control-Max-Age: "'600'"
+            ResponseTemplates:
+              application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Credentials: true
+            method.response.header.Access-Control-Max-Age: true
+          ResponseModels:
+            application/json: 'Empty'
+      ResourceId: !Ref ApiGatewayProxyResource
+      RestApiId: !Ref ApiGateway
+
+  # Gateway Response 配置
+  GatewayResponseDefault4XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-CSRFToken,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+        gatewayresponse.header.Access-Control-Max-Age: "'600'"
+
+  GatewayResponseDefault5XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-CSRFToken,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Credentials: "'true'"
+        gatewayresponse.header.Access-Control-Max-Age: "'600'"
 
 # 输出配置
 Outputs:
@@ -498,7 +760,10 @@ Outputs:
     Value: !GetAtt StaticDistribution.DomainName
   ApiURL:                      # API Gateway URL 输出
     Description: API Gateway endpoint URL
-    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/
+  ApiGatewayID:               # API Gateway ID 输出
+    Description: API Gateway ID
+    Value: !Ref ApiGateway
   VpcId:                       # VPC ID 输出
     Description: VPC ID
     Value: !Ref MainVPC
@@ -520,9 +785,6 @@ Outputs:
   StaticBucketName:           # S3 存储桶名称输出
     Description: S3 Bucket Name for Static Assets
     Value: !Ref StaticBucket
-  CloudFrontDomain:           # CloudFront 域名输出
-    Description: CloudFront Distribution Domain Name
-    Value: !GetAtt StaticDistribution.DomainName
   StaticAssetsUrl:           # 静态资源 URL 输出
     Description: URL for Static Assets
     Value: !Sub https://${StaticDistribution.DomainName}
