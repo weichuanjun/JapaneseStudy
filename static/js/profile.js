@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const formData = new FormData(profileForm);
 
         try {
-            const response = await fetch('/api/profile', {
+            const response = await window.apiCall('/api/profile', {
                 method: 'POST',
                 body: formData
             });
@@ -61,7 +61,7 @@ window.onclick = function (event) {
 // 显示用户信息弹窗
 async function showUserInfo(userId) {
     try {
-        const response = await fetch(`/api/user/${userId}`);
+        const response = await window.apiCall(`/api/user/${userId}`);
         const userData = await response.json();
 
         // 更新弹窗内容

@@ -1041,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', function() {
             clearTimeout(timeout);
             
             try {
-                const response = await fetch(`/api/user/${userId}`);
+                const response = await window.apiCall(`/api/user/${userId}`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -1177,7 +1177,7 @@ function setTopicDifficulty(difficulty) {
 
 // 获取随机文本
 function getRandomText() {
-    fetch('/api/reading/random', {
+    window.apiCall('/api/reading/random', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1202,7 +1202,7 @@ function getRandomText() {
 
 // 获取随机话题
 function getRandomTopic() {
-    fetch('/api/topic/random', {
+    window.apiCall('/api/topic/random', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

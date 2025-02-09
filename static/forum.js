@@ -16,7 +16,7 @@ function generatePastelColor() {
 
 // 加载标签列表
 function loadTags() {
-    fetch('/forum/api/tags')
+    window.apiCall('/forum/api/tags')
         .then(response => response.json())
         .then(tags => {
             // 更新标签筛选器
@@ -34,7 +34,6 @@ function loadTags() {
 
             // 更新新建帖子表单的标签下拉列表
             const tagSelect = document.getElementById('tag');
-            // 保留第一个默认选项
             tagSelect.innerHTML = '<option value="">タグを選択</option>';
             tags.forEach(tag => {
                 const option = document.createElement('option');
@@ -98,7 +97,7 @@ function showUserInfo(userId, clickEvent) {
         currentPopupCloseHandler = null;
     }
 
-    fetch(`/forum/api/user/${userId}`)
+    window.apiCall(`/forum/api/user/${userId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -263,7 +262,7 @@ function hideUserInfoPopup() {
 
 // 加载用户的帖子列表
 function loadUserPosts(userId) {
-    fetch(`/forum/api/user/${userId}/posts`)
+    window.apiCall(`/forum/api/user/${userId}/posts`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -362,7 +361,7 @@ function loadPosts(page = 1) {
         url += `&tag_id=${currentFilterTag}`;
     }
 
-    fetch(url)
+    window.apiCall(url)
         .then(response => response.json())
         .then(data => {
             // 保存当前滚动位置
@@ -655,13 +654,8 @@ function openPostDetail(postId) {
 function loadPostDetail() {
     if (!currentPostId) return;
 
-    fetch(`/forum/api/posts/${currentPostId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('投稿の詳細の読み込みに失敗しました');
-            }
-            return response.json();
-        })
+    window.apiCall(`/forum/api/posts/${currentPostId}`)
+        .then(response => response.json())
         .then(post => {
             if (post.error) {
                 console.error('投稿の詳細の読み込みに失敗しました:', post.error);
@@ -728,13 +722,8 @@ function loadComments(postId) {
         return;
     }
 
-    fetch(`/forum/api/posts/${postId}/comments`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('コメントの読み込みに失敗しました');
-            }
-            return response.json();
-        })
+    window.apiCall(`/forum/api/posts/${postId}/comments`)
+        .then(response => response.json())
         .then(comments => {
             if (Array.isArray(comments)) {
                 const commentsContainer = document.getElementById('commentsContainer');
@@ -764,7 +753,7 @@ function handleNewPostSubmit(e) {
         return;
     }
 
-    fetch('/forum/api/posts', {
+    window.apiCall('/forum/api/posts', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -821,19 +810,14 @@ function handleNewCommentSubmit(e) {
         return;
     }
 
-    fetch(`/forum/api/posts/${currentPostId}/comments`, {
+    window.apiCall(`/forum/api/posts/${currentPostId}/comments`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({ content })
     })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('コメントの作成に失敗しました');
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(comment => {
             if (comment.error) {
                 console.error('コメントの作成に失敗しました:', comment.error);
@@ -945,7 +929,7 @@ document.getElementById('addTagBtn').addEventListener('click', function () {
     if (!tagName) return;
 
     // 检查是否已存在该标签
-    fetch('/forum/api/tags', {
+    window.apiCall('/forum/api/tags', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1005,8 +989,7 @@ function startAutoRefresh() {
     // 每3秒刷新一次
     autoRefreshInterval = setInterval(() => {
         if (document.visibilityState === 'visible') {  // 只在页面可见时刷新
-            // 获取最新的帖子
-            fetch(`/forum/api/posts?page=${currentPage}&per_page=20${currentFilterTag ? `&tag_id=${currentFilterTag}` : ''}`)
+            window.apiCall(`/forum/api/posts?page=${currentPage}&per_page=20${currentFilterTag ? `&tag_id=${currentFilterTag}` : ''}`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.posts) return;

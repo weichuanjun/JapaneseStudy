@@ -4,7 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- 环境配置 -->
+    <meta name="environment" content="{{ env }}">
+    <meta name="api-base-url" content="{{ config.API_BASE_URL }}">
+    <meta name="static-base-url" content="{{ config.STATIC_BASE_URL }}">
+    <meta name="cloudfront-domain" content="{{ config.CLOUDFRONT_DOMAIN }}">
+    <meta name="azure-region" content="{{ config.AZURE_REGION }}">
+    <meta name="subscription-key" content="{{ config.SUBSCRIPTION_KEY }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!-- 配置文件 -->
+    <script src="{{ static_url('js/config.js') }}"></script>
+    
+    <!-- CSS 文件 -->
+    <link rel="stylesheet" href="{{ static_url('css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     {% block extra_css %}{% endblock %}
     <style>
@@ -211,12 +225,16 @@
     </script>
     {% endif %}
 
-    <meta name="csrf-token" content="{{ csrf_token() }}">
     <script>
+        // 配置 jQuery AJAX 默认设置
         $.ajaxSetup({
             beforeSend: function(xhr, settings) {
                 if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
                     xhr.setRequestHeader("X-CSRFToken", $('meta[name="csrf-token"]').attr('content'));
+                }
+                // 添加 API 基础 URL
+                if (!settings.url.startsWith('http') && window.APP_CONFIG.API_BASE_URL) {
+                    settings.url = window.APP_CONFIG.API_BASE_URL + settings.url;
                 }
             }
         });

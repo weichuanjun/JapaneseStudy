@@ -246,7 +246,7 @@ function showRecordPopup(record, type) {
 async function loadReadingRecords() {
     showLoading('readingRecordsBody');
     try {
-        const response = await fetch('/api/reading/records');
+        const response = await window.apiCall('/api/reading/records');
         if (!response.ok) {
             throw new Error('データの取得に失敗しました');
         }
@@ -298,7 +298,7 @@ async function loadReadingRecords() {
 async function loadTopicRecords() {
     showLoading('topicRecordsBody');
     try {
-        const response = await fetch('/api/topic/records');
+        const response = await window.apiCall('/api/topic/records');
         if (!response.ok) {
             throw new Error('データの取得に失敗しました');
         }
@@ -348,7 +348,7 @@ async function loadTopicRecords() {
 async function loadLeaderboards(difficulty = 'easy') {
     try {
         // 加载读文章排行榜
-        const readingResponse = await fetch(`/api/reading/leaderboard/${difficulty}`);
+        const readingResponse = await window.apiCall(`/api/reading/leaderboard/${difficulty}`);
         if (!readingResponse.ok) {
             throw new Error('読み込みに失敗しました');
         }
@@ -356,7 +356,7 @@ async function loadLeaderboards(difficulty = 'easy') {
         updateLeaderboard(readingData, 'readingLeaderboard');
 
         // 加载Topic排行榜
-        const topicResponse = await fetch(`/api/topic/leaderboard/${difficulty}`);
+        const topicResponse = await window.apiCall(`/api/topic/leaderboard/${difficulty}`);
         if (!topicResponse.ok) {
             throw new Error('読み込みに失敗しました');
         }
@@ -426,7 +426,7 @@ function updateLeaderboard(data, elementId) {
 // 加载问候语
 async function loadGreeting() {
     try {
-        const response = await fetch('/api/dashboard/greeting');
+        const response = await window.apiCall('/api/dashboard/greeting');
         const data = await response.json();
         const greetingElement = document.getElementById('userGreeting');
         if (greetingElement) {
@@ -449,7 +449,7 @@ async function loadLearningAdvice() {
     adviceElement.innerHTML = '<div class="loading">アドバイスを生成中...</div>';
 
     try {
-        const response = await fetch('/api/dashboard/advice');
+        const response = await window.apiCall('/api/dashboard/advice');
         const data = await response.json();
 
         if (data.success) {
@@ -526,7 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 加载对应难度的排行榜
                 if (type === 'reading') {
-                    fetch(`/api/reading/leaderboard/${difficulty}`)
+                    window.apiCall(`/api/reading/leaderboard/${difficulty}`)
                         .then(response => response.json())
                         .then(data => updateLeaderboard(data, 'readingLeaderboard'))
                         .catch(error => {
@@ -535,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 '<tr><td colspan="3">データの読み込みに失敗しました</td></tr>';
                         });
                 } else if (type === 'topic') {
-                    fetch(`/api/topic/leaderboard/${difficulty}`)
+                    window.apiCall(`/api/topic/leaderboard/${difficulty}`)
                         .then(response => response.json())
                         .then(data => updateLeaderboard(data, 'topicLeaderboard'))
                         .catch(error => {
@@ -574,7 +574,7 @@ function bindUserPopupEvents() {
             clearTimeout(timeout);
 
             try {
-                const response = await fetch(`/api/user/${userId}`);
+                const response = await window.apiCall(`/api/user/${userId}`);
                 const data = await response.json();
 
                 if (data.success) {

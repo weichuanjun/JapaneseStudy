@@ -25,6 +25,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from ai_advisor import get_greeting, get_learning_advice
 from io import BytesIO
 from jinja2 import BaseLoader, TemplateNotFound
+from dotenv import load_dotenv
 
 class S3TemplateLoader(BaseLoader):
     def __init__(self, bucket_name):
@@ -42,16 +43,39 @@ class S3TemplateLoader(BaseLoader):
             raise TemplateNotFound(template)
 
 def create_app(config_name='default'):
-    # 修改 Flask 应用初始化
+    # 加载环境变量
+    load_dotenv()
+    
     app = Flask(__name__,
-                static_folder='static',  # 保留静态文件夹配置
-                static_url_path='/static')  # 明确指定静态文件URL路径
+                static_folder='static',
+                static_url_path='/static',
+                template_folder='templates')
 
-    # 确保配置名称有效
-    if config_name not in config:
-        config_name = 'default'
-        
-    app.config.from_object(config[config_name])
+    # 设置基本配置
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_key')
+    app.config['WTF_CSRF_SECRET_KEY'] = os.getenv('WTF_CSRF_SECRET_KEY', 'csrf_dev_key')
+    
+    # 设置数据库配置
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = os.getenv('SQLALCHEMY_TRACK_MODIFICATIONS', 'False').lower() == 'true'
+    
+    # 根据环境加载配置
+    if os.getenv('FLASK_ENV') == 'production':
+        app.config.from_object(config['production'])
+    else:
+        app.config.from_object(config['development'])
+    
+    # 从环境变量文件加载配置
+    if os.getenv('APP_CONFIG_FILE'):
+        app.config.from_pyfile(os.getenv('APP_CONFIG_FILE'))
+
+    # 配置允许的源
+    ALLOWED_ORIGINS = [
+        f"https://{os.getenv('API_GATEWAY_ID')}.execute-api.{os.getenv('AWS_REGION')}.amazonaws.com",
+        f"https://{os.getenv('CLOUDFRONT_DOMAIN')}",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000"
+    ]
 
     # 在生产环境中使用 S3 模板加载器
     if app.config['FLASK_ENV'] in ['production', 'prod']:
@@ -64,24 +88,33 @@ def create_app(config_name='default'):
     # 注册上下文处理器
     @app.context_processor
     def utility_processor():
+        env = os.getenv('FLASK_ENV', 'development')
+        config = {
+            'API_BASE_URL': os.getenv('API_BASE_URL', ''),
+            'STATIC_BASE_URL': os.getenv('STATIC_BASE_URL', '/static'),
+            'CLOUDFRONT_DOMAIN': os.getenv('CLOUDFRONT_DOMAIN', ''),
+            'AZURE_REGION': os.getenv('AZURE_REGION', ''),
+            'SUBSCRIPTION_KEY': os.getenv('SUBSCRIPTION_KEY', ''),
+            'ENV': env
+        }
+        
         def static_url(filename):
             """生成静态文件URL"""
-            if app.config['FLASK_ENV'] in ['production', 'prod']:
-                # 使用 CloudFront URL
-                return f"{os.getenv('CLOUDFRONT_DOMAIN')}/static/{filename}"
+            if env == 'production':
+                return f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/static/{filename}"
             return url_for('static', filename=filename)
                 
         def asset_url(filename):
             """生成资源文件URL"""
-            if app.config['FLASK_ENV'] in ['production', 'prod']:
-                # 使用 CloudFront URL
-                return f"{os.getenv('CLOUDFRONT_DOMAIN')}/{filename}"
+            if env == 'production':
+                return f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/{filename}"
             return url_for('static', filename=filename)
                 
         return dict(
             static_url=static_url,
             asset_url=asset_url,
-            env=app.config['FLASK_ENV']
+            env=env,
+            config=config
         )
 
     # 使用 config.py 中的数据库配置

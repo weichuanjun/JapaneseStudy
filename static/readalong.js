@@ -2,19 +2,14 @@ var authorizationToken;
 var start = false;
 var stopf = false;
 
-function gettoken(){
-    var request = new XMLHttpRequest();
-    request.open('POST', '/gettoken', true);
-
-    // Callback function for when request completes
-    request.onload = () => {
-        // Extract JSON data from request
-        const data = JSON.parse(request.responseText);
-        authorizationToken = data.at;
-    }
-    
-    //send request
-    request.send();
+function gettoken() {
+    window.apiCall('/gettoken', {
+        method: 'POST'
+    })
+        .then(response => response.json())
+        .then(data => {
+            authorizationToken = data.at;
+        });
     return false;
 }
 
@@ -27,7 +22,7 @@ var region = "centralindia";
 var language = "en-IN";
 var SpeechSDK;
 var recognizer;
-var id=0;
+var id = 0;
 var storyi = 0;
 var story;
 var cursentence = "";
@@ -54,7 +49,7 @@ catch (e) {
     window.console.log("no sound context found, no audio output. " + e);
 }
 
-function initvars(){
+function initvars() {
     authorizationToken = "";
     phrases = [];
     region = "centralindia";
@@ -87,34 +82,25 @@ function initvars(){
     }
 }
 
-function getstory(id){
-    console.log("getting story "+id.toString());
-    var request = new XMLHttpRequest();
-    request.open('POST', '/getstory', true);
-
-    // Callback function for when request completes
-    request.onload = ()=>{
-        const data = JSON.parse(request.responseText);
-        //console.log(data);
-        if(data.code == 200) {
-            story = data.story;
-            //console.log(story);
-            document.getElementById("textleft").innerHTML = story[0];
-            document.getElementById("textdone").innerHTML = "";
-        }
-        else{
-            console.log("You have completed all stories");
-            document.getElementById("textleft").innerHTML = "--- THE END ---";
-        }
-    }
-    // Add data to send with request
-    const data = new FormData();
-    data.append("id",id);  
-
-    //send request
-    request.send(data);
-    
-    return false;     
+function getstory(id) {
+    console.log("getting story " + id.toString());
+    window.apiCall('/getstory', {
+        method: 'POST',
+        body: new FormData().append("id", id)
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.code == 200) {
+                story = data.story;
+                document.getElementById("textleft").innerHTML = story[0];
+                document.getElementById("textdone").innerHTML = "";
+            }
+            else {
+                console.log("You have completed all stories");
+                document.getElementById("textleft").innerHTML = "--- THE END ---";
+            }
+        });
+    return false;
 }
 getstory(id);
 
@@ -125,22 +111,22 @@ document.addEventListener("DOMContentLoaded", function () {
     pointsdiv = document.getElementById("pointsdiv");
     totalscorep = document.getElementById("totalscorep");
 
-    function score(points){
+    function score(points) {
         totalscore += points;
         var newpoint = document.createElement("p");
-        newpoint.innerHTML = (points>=0) ? "+"+points.toString() : points.toString() ;
+        newpoint.innerHTML = (points >= 0) ? "+" + points.toString() : points.toString();
         newpoint.className = "points";
-        if(pointsdiv.childElementCount >=5){
-            pointsdiv.removeChild(pointsdiv.childNodes[0]);  
+        if (pointsdiv.childElementCount >= 5) {
+            pointsdiv.removeChild(pointsdiv.childNodes[0]);
         }
         pointsdiv.appendChild(newpoint);
-        totalscorep.innerHTML = totalscore.toString() ;
-        
+        totalscorep.innerHTML = totalscore.toString();
+
     }
 
-    function getnextsentence(){
+    function getnextsentence() {
         console.log("getnextsentence");
-        if(storyi < story.length){
+        if (storyi < story.length) {
             cursentence = story[storyi];
             textleft.innerHTML = cursentence;
             textdone.innerHTML = "";
@@ -149,19 +135,18 @@ document.addEventListener("DOMContentLoaded", function () {
             cursentencewordsdone = [];
         }
     }
-    
-    function match(word){
-        if(word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g,"") == cursentencewordsleft[0].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g,"")){
+
+    function match(word) {
+        if (word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g, "") == cursentencewordsleft[0].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g, "")) {
             cursentencewordsdone.push(cursentencewordsleft.shift());
             console.log("MATCH = " + word);
             textdone.innerHTML = cursentencewordsdone.join(" ") + " ";
             textleft.innerHTML = cursentencewordsleft.join(" ");
             score(2);
         }
-        else if(nomatchflag > 0)
-        {
-            if(word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g,"") == cursentencewordsleft[1].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g,"")){
-                console.log("GOT A SKIP AND MATCH for " + word + " at nomatchflag ="+ nomatchflag.toString());
+        else if (nomatchflag > 0) {
+            if (word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g, "") == cursentencewordsleft[1].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g, "")) {
+                console.log("GOT A SKIP AND MATCH for " + word + " at nomatchflag =" + nomatchflag.toString());
                 nomatchflag = 0;
                 cursentencewordsdone.push(cursentencewordsleft.shift());
                 cursentencewordsdone.push(cursentencewordsleft.shift());
@@ -169,33 +154,31 @@ document.addEventListener("DOMContentLoaded", function () {
                 textleft.innerHTML = cursentencewordsleft.join(" ");
                 score(1);
             }
-            else
-            {
+            else {
                 console.log("SKIP BUT NO MATCH!");
             }
         }
-        else{
+        else {
             nomatchflag = 1;
             score(-1);
-            console.log("NOMATCH for " + cursentencewordsleft[0].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g,"").italics() + ". Instead, received "+word.italics());
+            console.log("NOMATCH for " + cursentencewordsleft[0].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()"'?!]/g, "").italics() + ". Instead, received " + word.italics());
             console.log(cursentencewordsleft);
             console.log(cursentencewordsdone);
             console.log("NOMATCH END -----------------");
         }
-    
-        if(cursentencewordsleft.length == 0)
-        {
-            if(storyi<story.length){
+
+        if (cursentencewordsleft.length == 0) {
+            if (storyi < story.length) {
                 getnextsentence()
             }
-            else{
+            else {
                 console.log("FINISHED STORY");
                 stoppingfunction();
-            }   
+            }
         }
     }
 
-    function stoppingfunction(){
+    function stoppingfunction() {
         start = false;
         stopf = true;
         buttonmic.innerHTML = "<span class='fa fa-step-forward'></span>Next";
@@ -213,19 +196,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Starts continuous speech recognition.
     buttonmic.addEventListener("click", function () {
-        if(stopf){
+        if (stopf) {
             this.innerHTML = "<span class='fa fa-microphone'></span>Start";
             this.className = "green-button";
-            
+
             initvars();
             gettoken();
             id++;
             getstory(id);
         }
-        else if(start){
+        else if (start) {
             stoppingfunction();
         }
-        else{
+        else {
             start = true;
             this.innerHTML = "<span class='fa fa-stop'></span>Stop";
             this.className = "red-button";
@@ -234,7 +217,7 @@ document.addEventListener("DOMContentLoaded", function () {
             var prevwords = [];
 
             var audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-            
+
             var speechConfig;
             if (authorizationToken) {
                 speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authorizationToken, region);
@@ -256,11 +239,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 //window.console.log(e);
                 var curwords = e.result.text.split(" ");
                 //console.log(curwords);
-                for(var i=prevwords.length; i<curwords.length; i++){
+                for (var i = prevwords.length; i < curwords.length; i++) {
                     var curword = curwords[i];
                     match(curword);
                 }
-                prevwords = curwords;            
+                prevwords = curwords;
             };
 
             // The event recognized signals that a final recognition result is received.
@@ -293,3 +276,22 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 });
+
+// 使用全局配置初始化语音服务
+const speechConfig = speechsdk.SpeechConfig.fromSubscription(
+    window.APP_CONFIG.SUBSCRIPTION_KEY,
+    window.APP_CONFIG.AZURE_REGION
+);
+
+// 使用全局 apiCall 函数
+function submitScore(data) {
+    return window.apiCall('/api/submit-score', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+}
+
+// 使用全局 staticUrl 函数加载音频
+function loadAudio(url) {
+    return window.staticUrl(`audio/${url}`);
+}

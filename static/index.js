@@ -526,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('Generating text with difficulty:', currentDifficulty);
         this.classList.add('breathing-button');
 
-        fetch('/api/text/random', {
+        window.apiCall('/api/text/random', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('Generating topic with difficulty:', currentTopicDifficulty);
         this.classList.add('breathing-button');
 
-        fetch('/generate_topic', {
+        window.apiCall('/generate_topic', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -610,7 +610,7 @@ document.addEventListener('DOMContentLoaded', function () {
             topicText.value = 'トピックを生成中...';
             this.classList.add('breathing-button');
 
-            fetch('/generate_topic', {
+            window.apiCall('/generate_topic', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -686,7 +686,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                             try {
                                 // 发送音频进行识别
-                                const response = await fetch('/transcribe_audio', {
+                                const response = await window.apiCall('/transcribe_audio', {
                                     method: 'POST',
                                     body: formData
                                 });
@@ -710,7 +710,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 if (data.status === 'analyzing' && data.text) {
                                     setTimeout(async () => {
                                         try {
-                                            const analysisResponse = await fetch('/get_analysis', {
+                                            const analysisResponse = await window.apiCall('/get_analysis', {
                                                 method: 'POST',
                                                 headers: {
                                                     'Content-Type': 'application/json',
@@ -796,7 +796,7 @@ function hideComponents() {
 
 async function analyzeTopic(text, topic) {
     try {
-        const response = await fetch('/analyze_topic', {
+        const response = await window.apiCall('/analyze_topic', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -832,7 +832,7 @@ function handleTranscriptionComplete(text, topic) {
 
 // 获取随机话题
 function getRandomTopic() {
-    fetch('/api/topic/random', {
+    window.apiCall('/api/topic/random', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -857,7 +857,7 @@ function getRandomTopic() {
 
 // 获取随机文本
 function getRandomText() {
-    fetch('/api/text/random', {
+    window.apiCall('/api/text/random', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

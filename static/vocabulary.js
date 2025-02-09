@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             showLoading(true);
 
-            const response = await fetch('/api/vocabulary/word', {
+            const response = await window.apiCall('/api/vocabulary/word', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // 记录答案
         try {
-            await fetch('/api/vocabulary/record', {
+            await window.apiCall('/api/vocabulary/record', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function loadStats() {
         try {
-            const response = await fetch(`/api/vocabulary/stats?user_id=${userId}`);
+            const response = await window.apiCall(`/api/vocabulary/stats?user_id=${userId}`);
             if (!response.ok) {
                 throw new Error('Failed to load stats');
             }
@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function loadHistory() {
         try {
-            const response = await fetch(`/api/vocabulary/history?user_id=${userId}&limit=20`);
+            const response = await window.apiCall(`/api/vocabulary/history?user_id=${userId}&limit=20`);
             if (!response.ok) {
                 throw new Error('Failed to load history');
             }
@@ -226,7 +226,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function loadFavorites() {
         try {
-            const response = await fetch(`/api/vocabulary/favorites?user_id=${userId}`);
+            const response = await window.apiCall(`/api/vocabulary/favorites?user_id=${userId}`);
             if (!response.ok) {
                 throw new Error('Failed to load favorites');
             }
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function addToFavorites(word) {
         try {
-            const response = await fetch('/api/vocabulary/favorite', {
+            const response = await window.apiCall('/api/vocabulary/favorite', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function removeFromFavorites(word) {
         try {
-            const response = await fetch(`/api/vocabulary/favorite?word=${encodeURIComponent(word.word)}&user_id=${userId}`, {
+            const response = await window.apiCall(`/api/vocabulary/favorite?word=${encodeURIComponent(word.word)}&user_id=${userId}`, {
                 method: 'DELETE'
             });
 
@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function checkIfFavorited(word) {
         try {
-            const response = await fetch(`/api/vocabulary/favorites?user_id=${userId}`);
+            const response = await window.apiCall(`/api/vocabulary/favorites?user_id=${userId}`);
             if (!response.ok) {
                 throw new Error('Failed to check favorites');
             }
@@ -375,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function () {
             button.addEventListener('click', async () => {
                 const word = button.dataset.word;
                 try {
-                    const response = await fetch(`/api/vocabulary/favorite?word=${encodeURIComponent(word)}&user_id=${userId}`, {
+                    const response = await window.apiCall(`/api/vocabulary/favorite?word=${encodeURIComponent(word)}&user_id=${userId}`, {
                         method: 'DELETE'
                     });
 
@@ -418,5 +418,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateStats(stats) {
         // 实现更新统计信息的逻辑
+    }
+
+    // 使用全局 apiCall 函数
+    function loadVocabulary() {
+        window.apiCall('/vocabulary/api/words')
+            .then(response => response.json())
+            .then(data => {
+                // 处理数据
+            })
+            .catch(error => console.error('単語の読み込みに失敗しました:', error));
+    }
+
+    // 使用全局 staticUrl 函数加载静态资源
+    function loadAudio(url) {
+        return window.staticUrl(`audio/${url}`);
+    }
+
+    // 使用全局 apiCall 函数提交数据
+    function submitAnswer(data) {
+        return window.apiCall('/vocabulary/api/submit', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
     }
 }); 
