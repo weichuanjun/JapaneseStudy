@@ -15,10 +15,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <!-- 配置文件 -->
-    <script src="{{ config.getAssetUrl('static/js/config.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
     
     <!-- CSS 文件 -->
-    <link rel="stylesheet" href="{{ config.getAssetUrl('static/css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     {% block extra_css %}{% endblock %}
     <style>
@@ -83,22 +83,22 @@
         {% if current_user %}
         <ul class="nav-list">
             <li class="nav-item">
-                <a href="{{ url_for('index', active_tab='dashboard') }}" class="nav-link {% if active_tab == 'dashboard' %}active{% endif %}">
+                <a href="{{ url_for('main.index', active_tab='dashboard') }}" class="nav-link {% if active_tab == 'dashboard' %}active{% endif %}">
                     <i class="fas fa-chart-line"></i> ダッシュボード
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('index', active_tab='read') }}" class="nav-link {% if active_tab == 'read' %}active{% endif %}">
+                <a href="{{ url_for('main.index', active_tab='read') }}" class="nav-link {% if active_tab == 'read' %}active{% endif %}">
                     <i class="fas fa-book-reader"></i> 発音練習
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('index', active_tab='topic') }}" class="nav-link {% if active_tab == 'topic' %}active{% endif %}">
+                <a href="{{ url_for('main.index', active_tab='topic') }}" class="nav-link {% if active_tab == 'topic' %}active{% endif %}">
                     <i class="fas fa-comments"></i> スピーチ
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('vocabulary') }}" class="nav-link {% if active_tab == 'vocabulary' %}active{% endif %}">
+                <a href="{{ url_for('vocabulary.vocabulary_page') }}" class="nav-link {% if active_tab == 'vocabulary' %}active{% endif %}">
                     <i class="fas fa-book"></i> 単語学習
                 </a>
             </li>
@@ -183,10 +183,17 @@
 
     {% block content %}{% endblock %}
 
-    {% block scripts %}
+    <!-- 基础 JavaScript 库 -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="{{ config.getAssetUrl('static/js/index.js') }}"></script>
-    {% endblock %}
+    
+    <!-- 配置和工具 -->
+    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+    
+    <!-- 页面特定的 JavaScript -->
+    {% block scripts %}{% endblock %}
+
+    <!-- 额外的 JavaScript -->
+    {% block extra_js %}{% endblock %}
 
     {% if current_user %}
     <script>
@@ -233,14 +240,8 @@
                 if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
                     xhr.setRequestHeader("X-CSRFToken", $('meta[name="csrf-token"]').attr('content'));
                 }
-                // 添加 API 基础 URL
-                if (!settings.url.startsWith('http') && window.APP_CONFIG.API_BASE_URL) {
-                    settings.url = window.APP_CONFIG.API_BASE_URL + settings.url;
-                }
             }
         });
     </script>
-
-    {% block extra_js %}{% endblock %}
 </body>
 </html> 

@@ -3,13 +3,18 @@ var start = false;
 var stopf = false;
 
 function gettoken() {
-    window.apiCall('/gettoken', {
-        method: 'POST'
-    })
-        .then(response => response.json())
-        .then(data => {
-            authorizationToken = data.at;
-        });
+    var request = new XMLHttpRequest();
+    request.open('POST', '/gettoken', true);
+
+    // Callback function for when request completes
+    request.onload = () => {
+        // Extract JSON data from request
+        const data = JSON.parse(request.responseText);
+        authorizationToken = data.at;
+    }
+
+    //send request
+    request.send();
     return false;
 }
 
@@ -84,22 +89,31 @@ function initvars() {
 
 function getstory(id) {
     console.log("getting story " + id.toString());
-    window.apiCall('/getstory', {
-        method: 'POST',
-        body: new FormData().append("id", id)
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.code == 200) {
-                story = data.story;
-                document.getElementById("textleft").innerHTML = story[0];
-                document.getElementById("textdone").innerHTML = "";
-            }
-            else {
-                console.log("You have completed all stories");
-                document.getElementById("textleft").innerHTML = "--- THE END ---";
-            }
-        });
+    var request = new XMLHttpRequest();
+    request.open('POST', '/getstory', true);
+
+    // Callback function for when request completes
+    request.onload = () => {
+        const data = JSON.parse(request.responseText);
+        //console.log(data);
+        if (data.code == 200) {
+            story = data.story;
+            //console.log(story);
+            document.getElementById("textleft").innerHTML = story[0];
+            document.getElementById("textdone").innerHTML = "";
+        }
+        else {
+            console.log("You have completed all stories");
+            document.getElementById("textleft").innerHTML = "--- THE END ---";
+        }
+    }
+    // Add data to send with request
+    const data = new FormData();
+    data.append("id", id);
+
+    //send request
+    request.send(data);
+
     return false;
 }
 getstory(id);
@@ -276,22 +290,3 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 });
-
-// 使用全局配置初始化语音服务
-const speechConfig = speechsdk.SpeechConfig.fromSubscription(
-    window.APP_CONFIG.SUBSCRIPTION_KEY,
-    window.APP_CONFIG.AZURE_REGION
-);
-
-// 使用全局 apiCall 函数
-function submitScore(data) {
-    return window.apiCall('/api/submit-score', {
-        method: 'POST',
-        body: JSON.stringify(data)
-    });
-}
-
-// 使用全局 staticUrl 函数加载音频
-function loadAudio(url) {
-    return window.staticUrl(`audio/${url}`);
-}

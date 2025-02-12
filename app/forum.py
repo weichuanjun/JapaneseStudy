@@ -49,8 +49,8 @@ except Exception as e:
     logging.error(f"Gemini API 配置失败: {str(e)}")
     raise RuntimeError("Gemini API 配置失败") from e
 
-# 创建蓝图，添加URL前缀
-forum_bp = Blueprint('forum', __name__, url_prefix='/forum')
+# 创建蓝图，修改URL前缀
+forum_bp = Blueprint('forum', __name__)
 
 # 在文件开头添加常量
 MOMO_USER_ID = 9999999  # momo 的固定用户 ID，使用一个足够大的数值
@@ -486,7 +486,7 @@ def get_post(post_id):
         })
     except Exception as e:
         log_error(f"获取帖子详情时出错: {str(e)}")
-        return jsonify({'error': '投稿的詳細の取得に失敗しました'}), 500
+        return jsonify({'error': '投稿の詳細の取得に失敗しました'}), 500
 
 @forum_bp.route('/api/posts/<int:post_id>/comments', methods=['GET'])
 @login_required
@@ -564,7 +564,7 @@ def create_post():
     except Exception as e:
         db.session.rollback()
         log_error(f"创建帖子时出错: {str(e)}")
-        return jsonify({'error': '投稿的作成に失敗しました'}), 500
+        return jsonify({'error': '投稿の作成に失敗しました'}), 500
 
 def add_ai_response_with_app(app, post_id, content, user_id=None):
     """在应用上下文中添加 AI 回复"""
@@ -712,7 +712,7 @@ def get_user_posts(user_id):
             'error': '获取用户帖子列表失败'
         }), 500 
 
-@forum_bp.route('/api/tags', methods=['GET'])
+@forum_bp.route('/api/tags')
 @login_required
 def get_tags():
     """获取所有标签"""
@@ -961,7 +961,7 @@ def delete_post(post_id):
     except Exception as e:
         db.session.rollback()
         log_error(f"删除帖子时出错: {str(e)}")
-        return jsonify({'error': '投稿的削除に失敗しました'}), 500
+        return jsonify({'error': '投稿の削除に失敗しました'}), 500
 
 @forum_bp.route('/comments/<int:comment_id>/delete', methods=['POST'])
 @login_required
@@ -982,7 +982,7 @@ def delete_comment(comment_id):
     except Exception as e:
         db.session.rollback()
         log_error(f"删除评论时出错: {str(e)}")
-        return jsonify({'error': 'コメント的削除に失敗しました'}), 500
+        return jsonify({'error': 'コメントの削除に失敗しました'}), 500
 
 @forum_bp.route('/tags/new', methods=['POST'])
 @login_required
@@ -1011,7 +1011,7 @@ def create_tag():
     except Exception as e:
         db.session.rollback()
         log_error(f"创建标签时出错: {str(e)}")
-        return jsonify({'error': 'タグ的作成に失敗しました'}), 500
+        return jsonify({'error': 'タグの作成に失敗しました'}), 500
 
 @forum_bp.route('/tags/<int:tag_id>/delete', methods=['POST'])
 @login_required
@@ -1026,7 +1026,7 @@ def delete_tag(tag_id):
     except Exception as e:
         db.session.rollback()
         log_error(f"删除标签时出错: {str(e)}")
-        return jsonify({'error': 'タグ的削除に失敗しました'}), 500 
+        return jsonify({'error': 'タグの削除に失敗しました'}), 500 
 
 @forum_bp.route('/momo')
 def momo_profile():

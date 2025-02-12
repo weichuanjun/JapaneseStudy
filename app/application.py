@@ -23,6 +23,7 @@ from functools import wraps
 from app.vocabulary import vocabulary_bp
 from app.forum import forum_bp
 from app.profile import profile_bp
+from app.main import main_bp
 from werkzeug.utils import secure_filename
 from PIL import Image
 from datetime import datetime, timedelta
@@ -164,9 +165,10 @@ def create_app(config_name='default'):
     migrate = Migrate(app, db)
 
     # 注册蓝图
-    app.register_blueprint(vocabulary_bp)
-    app.register_blueprint(forum_bp)
-    app.register_blueprint(profile_bp)
+    app.register_blueprint(main_bp)
+    app.register_blueprint(vocabulary_bp, url_prefix='/vocabulary')
+    app.register_blueprint(forum_bp, url_prefix='/forum')
+    app.register_blueprint(profile_bp, url_prefix='/profile')
 
     # 登录验证装饰器
     def login_required(f):

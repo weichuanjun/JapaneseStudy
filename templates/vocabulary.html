@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+{% block title %}単語学習{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/vocabulary.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="vocabulary-container" data-user-id="{{ current_user.id }}">
     <div class="category-preview">
@@ -573,5 +579,11 @@
 }
 </style>
 
-<script src="{{ url_for('static', filename='vocabulary.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vocabulary.js') }}"></script>
+<script>
+    // 调试信息
+    console.log('Vocabulary page loaded');
+    console.log('APP_CONFIG:', window.APP_CONFIG);
+    console.log('apiCall available:', typeof window.apiCall === 'function');
+</script>
 {% endblock %} 

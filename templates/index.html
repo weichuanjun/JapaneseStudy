@@ -993,9 +993,34 @@
 
 {% block scripts %}
 {{ super() }}
+<!-- 基础库 -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<!-- Microsoft Speech SDK -->
+<script src="{{ url_for('static', filename='js/microsoft.cognitiveservices.speech.sdk.bundle.js') }}"></script>
+
+<!-- 录音相关 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/RecorderJS/0.1.0/recorder.js"></script>
+
+<!-- 应用脚本 -->
+<script src="{{ url_for('static', filename='js/config.js') }}"></script>
+<script src="{{ url_for('static', filename='js/index.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-<script src="{{ url_for('static', filename='index.js') }}"></script>
-<script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
+<script src="{{ url_for('static', filename='js/readalong.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pronunciation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vocabulary.js') }}"></script>
+<script src="{{ url_for('static', filename='js/forum.js') }}"></script>
+<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+
+<!-- 初始化全局变量 -->
+<script>
+// 全局变量
+window.currentDifficulty = 'easy';
+window.currentTopicDifficulty = 'easy';
+</script>
+
 <script>
 function toggleRecords(recordsId) {
     const content = document.getElementById(recordsId);

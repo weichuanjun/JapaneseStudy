@@ -3,7 +3,7 @@
 {% block title %}掲示板 - 日本語学習{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='forum.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/forum.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -165,5 +165,11 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='forum.js') }}"></script>
+<script src="{{ url_for('static', filename='js/forum.js') }}"></script>
+<script>
+    // 调试信息
+    console.log('Forum page loaded');
+    console.log('APP_CONFIG:', window.APP_CONFIG);
+    console.log('apiCall available:', typeof window.apiCall === 'function');
+</script>
 {% endblock %} 

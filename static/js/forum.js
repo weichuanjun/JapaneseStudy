@@ -16,7 +16,7 @@ function generatePastelColor() {
 
 // 加载标签列表
 function loadTags() {
-    window.apiCall('/api/tags')
+    window.apiCall('/forum/api/tags')
         .then(response => response.json())
         .then(tags => {
             // 更新标签筛选器
@@ -97,7 +97,7 @@ function showUserInfo(userId, clickEvent) {
         currentPopupCloseHandler = null;
     }
 
-    window.apiCall(`/api/user/${userId}`)
+    window.apiCall(`/forum/api/user/${userId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -262,20 +262,37 @@ function hideUserInfoPopup() {
 
 // 加载用户的帖子列表
 function loadUserPosts(userId) {
-    window.apiCall(`/api/user/${userId}/posts`)
+    window.apiCall(`/forum/api/user/${userId}/posts`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 const postsContainer = document.getElementById('forumPopupPosts');
                 postsContainer.innerHTML = '';
+
+                if (data.posts.length === 0) {
+                    postsContainer.innerHTML = '<div class="no-posts">投稿はありません</div>';
+                    return;
+                }
+
                 data.posts.forEach(post => {
                     const postElement = document.createElement('div');
-                    postElement.className = 'popup-post-item';
+                    postElement.className = 'user-post-item';
                     postElement.innerHTML = `
-                        <div class="popup-post-title">${post.title}</div>
-                        <div class="popup-post-date">${post.created_at}</div>
+                        <div class="user-post-title">${post.title}</div>
+                        <div class="user-post-meta">
+                            <span class="user-post-time">${formatDate(post.created_at)}</span>
+                            <span class="user-post-comments">
+                                <i class="fas fa-comment"></i>
+                                ${post.comment_count}
+                            </span>
+                        </div>
                     `;
-                    postElement.onclick = () => loadPostDetails(post.id);
+
+                    // 添加点击事件，打开帖子详情
+                    postElement.addEventListener('click', () => {
+                        openPostDetail(post.id);
+                    });
+
                     postsContainer.appendChild(postElement);
                 });
             }
@@ -336,18 +353,29 @@ function loadPosts(page = 1) {
     const postsContainer = document.querySelector('.posts-container');
     const paginationContainer = document.querySelector('.pagination');
 
+    if (!postsContainer) {
+        console.error('Posts container not found');
+        return;
+    }
+
+    // 显示加载状态
+    postsContainer.innerHTML = '<div class="loading">投稿を読み込み中...</div>';
+
     // 更新当前页码
     currentPage = page;
 
-    const url = currentFilterTag
-        ? `/api/posts?page=${page}&tag=${currentFilterTag}`
-        : `/api/posts?page=${page}`;
+    let url = `/forum/api/posts?page=${page}&per_page=20`;
+    if (currentFilterTag) {
+        url += `&tag_id=${currentFilterTag}`;
+    }
 
     window.apiCall(url)
         .then(response => response.json())
         .then(data => {
-            // 保存当前滚动位置
-            const scrollPos = window.scrollY;
+            if (!data.posts || data.posts.length === 0) {
+                postsContainer.innerHTML = '<div class="no-posts">投稿がありません</div>';
+                return;
+            }
 
             postsContainer.innerHTML = '';
             data.posts.forEach(post => {
@@ -355,19 +383,16 @@ function loadPosts(page = 1) {
                 postsContainer.appendChild(postCard);
             });
 
-            // 创建分页并保存总数
-            createPagination(data.total, data.pages, page, paginationContainer);
-            paginationContainer.dataset.total = data.total;
-
-            // 如果是用户主动切换页面，滚动到顶部
-            if (scrollPos > 0) {
-                window.scrollTo({
-                    top: 0,
-                    behavior: 'smooth'
-                });
+            // 创建分页
+            if (paginationContainer && data.total > 0) {
+                createPagination(data.total, data.pages, page, paginationContainer);
+                paginationContainer.dataset.total = data.total;
             }
         })
-        .catch(error => console.error('投稿の読み込みに失敗しました:', error));
+        .catch(error => {
+            console.error('投稿の読み込みに失敗しました:', error);
+            postsContainer.innerHTML = '<div class="error-message">投稿の読み込みに失敗しました</div>';
+        });
 }
 
 // 创建帖子卡片
@@ -431,11 +456,31 @@ function createPostCard(post) {
 function initializeForum() {
     console.log('Initializing forum...');
 
+    // 检查是否在论坛页面
+    const forumContainer = document.querySelector('.forum-container');
+    if (!forumContainer) {
+        console.error('Forum container not found');
+        return;
+    }
+
+    // 创建并添加刷新按钮
+    const refreshButton = document.createElement('button');
+    refreshButton.className = 'refresh-button';
+    refreshButton.innerHTML = '<i class="fas fa-sync"></i>';
+    refreshButton.onclick = () => loadPosts(currentPage);
+
+    // 将刷新按钮插入到论坛容器的开始位置
+    if (forumContainer.firstChild) {
+        forumContainer.insertBefore(refreshButton, forumContainer.firstChild);
+    } else {
+        forumContainer.appendChild(refreshButton);
+    }
+
+    // 加载标签列表
+    loadTags();
+
     // 加载初始帖子列表
     loadPosts(1);
-
-    // 启动自动刷新
-    startAutoRefresh();
 
     // 处理新建帖子表单提交
     const newPostForm = document.getElementById('newPostForm');
@@ -502,11 +547,28 @@ function initializeUserInfoPopup() {
     }
 }
 
-// 页面加载完成后初始化
+// 监听标签页切换
+document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('nav-link')) {
+        const tabId = e.target.getAttribute('data-tab');
+        if (tabId === 'forum') {
+            console.log('Forum tab activated');
+            initializeForum();
+        } else {
+            // 如果切换到其他标签页，停止自动刷新
+            stopAutoRefresh();
+        }
+    }
+});
+
+// 页面加载完成后检查是否需要初始化
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('DOM loaded, initializing...');
-    loadTags();  // 加载标签列表
-    initializeForum();
+    console.log('DOM loaded, checking forum page...');
+    const forumContainer = document.querySelector('.forum-container');
+    if (forumContainer) {
+        console.log('Forum container found, initializing...');
+        initializeForum();
+    }
 });
 
 // 创建分页控件
@@ -619,24 +681,29 @@ function createCommentElement(comment) {
 function openPostDetail(postId) {
     currentPostId = postId;
     const modal = document.getElementById('postDetailModal');
+
+    // 创建并添加刷新按钮到模态框头部
+    const modalHeader = modal.querySelector('.modal-header');
+    if (modalHeader && !modalHeader.querySelector('.refresh-detail-button')) {
+        const refreshButton = document.createElement('button');
+        refreshButton.className = 'refresh-detail-button';
+        refreshButton.innerHTML = '<i class="fas fa-sync"></i> 刷新';
+        refreshButton.onclick = () => loadPostDetail();
+        modalHeader.insertBefore(refreshButton, modalHeader.querySelector('.close'));
+    }
+
     modal.style.display = 'block';
     document.body.classList.add('modal-open');
 
     // 加载帖子详情
     loadPostDetail();
-
-    // 设置定期更新
-    if (postDetailUpdateInterval) {
-        clearInterval(postDetailUpdateInterval);
-    }
-    postDetailUpdateInterval = setInterval(loadPostDetail, 3000); // 每5秒更新一次
 }
 
 // 加载帖子详情
 function loadPostDetail() {
     if (!currentPostId) return;
 
-    window.apiCall(`/api/posts/${currentPostId}`)
+    window.apiCall(`/forum/api/posts/${currentPostId}`)
         .then(response => response.json())
         .then(post => {
             if (post.error) {
@@ -674,26 +741,32 @@ function loadPostDetail() {
 
             // 添加用户信息弹窗功能
             const authorInfo = document.querySelector('.post-author-info');
-            authorInfo.dataset.userId = post.author_id;
+            if (authorInfo) {
+                authorInfo.dataset.userId = post.author_id;
 
-            // 移除旧的事件监听器
-            const newAuthorInfo = authorInfo.cloneNode(true);
-            authorInfo.parentNode.replaceChild(newAuthorInfo, authorInfo);
+                // 移除旧的事件监听器
+                const newAuthorInfo = authorInfo.cloneNode(true);
+                authorInfo.parentNode.replaceChild(newAuthorInfo, authorInfo);
 
-            // 添加新的点击事件监听器
-            newAuthorInfo.addEventListener('click', function (e) {
-                e.stopPropagation();
-                const userId = this.dataset.userId;
-                if (userId) {
-                    showUserInfo(userId, e);
-                }
-            });
+                // 添加新的点击事件监听器
+                newAuthorInfo.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const userId = this.dataset.userId;
+                    if (userId) {
+                        showUserInfo(userId, e);
+                    }
+                });
+            }
 
             // 更新评论
             loadComments(currentPostId);
         })
         .catch(error => {
             console.error('投稿の詳細の読み込みに失敗しました:', error);
+            const modal = document.getElementById('postDetailModal');
+            if (modal) {
+                modal.querySelector('.modal-body').innerHTML = '<div class="error-message">投稿の詳細の読み込みに失敗しました</div>';
+            }
         });
 }
 
@@ -704,22 +777,35 @@ function loadComments(postId) {
         return;
     }
 
-    window.apiCall(`/api/posts/${postId}/comments`)
+    const commentsContainer = document.getElementById('commentsContainer');
+    if (!commentsContainer) {
+        console.error('Comments container not found');
+        return;
+    }
+
+    commentsContainer.innerHTML = '<div class="loading">コメントを読み込み中...</div>';
+
+    window.apiCall(`/forum/api/posts/${postId}/comments`)
         .then(response => response.json())
         .then(comments => {
+            commentsContainer.innerHTML = '';
             if (Array.isArray(comments)) {
-                const commentsContainer = document.getElementById('commentsContainer');
-                commentsContainer.innerHTML = '';
+                if (comments.length === 0) {
+                    commentsContainer.innerHTML = '<div class="no-comments">コメントはありません</div>';
+                    return;
+                }
                 comments.forEach(comment => {
                     const commentElement = createCommentElement(comment);
                     commentsContainer.appendChild(commentElement);
                 });
             } else {
                 console.error('评论数据格式错误:', comments);
+                commentsContainer.innerHTML = '<div class="error-message">コメントの読み込みに失敗しました</div>';
             }
         })
         .catch(error => {
             console.error('コメントの読み込みに失敗しました:', error);
+            commentsContainer.innerHTML = '<div class="error-message">コメントの読み込みに失敗しました</div>';
         });
 }
 
@@ -735,7 +821,7 @@ function handleNewPostSubmit(e) {
         return;
     }
 
-    window.apiCall('/api/posts', {
+    window.apiCall('/forum/api/posts', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -792,7 +878,7 @@ function handleNewCommentSubmit(e) {
         return;
     }
 
-    window.apiCall(`/api/posts/${currentPostId}/comments`, {
+    window.apiCall(`/forum/api/posts/${currentPostId}/comments`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -844,12 +930,6 @@ function handleModalClose(e) {
         modal.style.display = 'none';
         document.body.classList.remove('modal-open');
 
-        // 清除更新计时器
-        if (postDetailUpdateInterval) {
-            clearInterval(postDetailUpdateInterval);
-            postDetailUpdateInterval = null;
-        }
-
         // 如果是帖子详情模态框，重置状态
         if (modal.id === 'postDetailModal') {
             currentPostId = null;
@@ -866,12 +946,6 @@ function handleOutsideModalClick(e) {
     if (e.target.classList.contains('modal')) {
         e.target.style.display = 'none';
         document.body.classList.remove('modal-open');
-
-        // 清除更新计时器
-        if (postDetailUpdateInterval) {
-            clearInterval(postDetailUpdateInterval);
-            postDetailUpdateInterval = null;
-        }
 
         if (e.target.id === 'postDetailModal') {
             currentPostId = null;
@@ -904,14 +978,13 @@ document.getElementById('tag').addEventListener('change', function () {
 });
 
 // 处理添加新标签按钮点击
-document.getElementById('addTagBtn').addEventListener('click', function () {
+document.getElementById('addTagBtn')?.addEventListener('click', function () {
     const newTagInput = document.getElementById('newTag');
     const tagName = newTagInput.value.trim();
 
     if (!tagName) return;
 
-    // 检查是否已存在该标签
-    window.apiCall('/api/tags', {
+    window.apiCall('/forum/api/tags', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -961,70 +1034,6 @@ document.getElementById('selectedTags').addEventListener('click', function (e) {
     }
 });
 
-// 启动自动刷新
-function startAutoRefresh() {
-    // 清除可能存在的旧定时器
-    if (autoRefreshInterval) {
-        clearInterval(autoRefreshInterval);
-    }
-
-    // 每3秒刷新一次
-    autoRefreshInterval = setInterval(() => {
-        if (document.visibilityState === 'visible') {  // 只在页面可见时刷新
-            window.apiCall(`/api/posts?page=${currentPage}&per_page=20${currentFilterTag ? `&tag_id=${currentFilterTag}` : ''}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.posts) return;
-
-                    const postsContainer = document.querySelector('.posts-container');
-                    const currentPosts = postsContainer.children;
-
-                    // 比较新旧帖子，只更新发生变化的部分
-                    data.posts.forEach((newPost, index) => {
-                        const existingPostCard = currentPosts[index];
-                        const newPostCard = createPostCard(newPost);
-
-                        if (!existingPostCard) {
-                            // 如果是新增的帖子，添加到列表中
-                            postsContainer.appendChild(newPostCard);
-                        } else {
-                            // 比较帖子内容、标题、时间和回复数是否相同
-                            const existingContent = existingPostCard.querySelector('.post-content').textContent;
-                            const existingTitle = existingPostCard.querySelector('.post-title').textContent;
-                            const existingTime = existingPostCard.querySelector('.post-time').textContent;
-                            const existingComments = existingPostCard.querySelector('.post-comments').textContent;
-                            const newCommentsText = `${newPost.comment_count} 件の返信`;
-
-                            if (existingContent !== newPost.content ||
-                                existingTitle !== newPost.title ||
-                                formatDate(newPost.created_at) !== existingTime ||
-                                existingComments !== newCommentsText) {
-
-                                // 如果只有回复数变化，只更新回复数
-                                if (existingContent === newPost.content &&
-                                    existingTitle === newPost.title &&
-                                    formatDate(newPost.created_at) === existingTime) {
-                                    existingPostCard.querySelector('.post-comments').textContent = newCommentsText;
-                                } else {
-                                    // 如果其他内容也变化，替换整个卡片
-                                    existingPostCard.replaceWith(newPostCard);
-                                }
-                            }
-                        }
-                    });
-
-                    // 更新分页信息，但保持当前页面状态
-                    const paginationContainer = document.querySelector('.pagination');
-                    if (data.total !== parseInt(paginationContainer.dataset.total)) {
-                        createPagination(data.total, data.pages, currentPage, paginationContainer);
-                        paginationContainer.dataset.total = data.total;
-                    }
-                })
-                .catch(error => console.error('投稿の読み込みに失敗しました:', error));
-        }
-    }, 3000);
-}
-
 // 停止自动刷新
 function stopAutoRefresh() {
     if (autoRefreshInterval) {
@@ -1033,81 +1042,5 @@ function stopAutoRefresh() {
     }
 }
 
-// 监听页面可见性变化
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        // 页面变为可见时，立即刷新一次并重启自动刷新
-        loadPosts(1);
-        startAutoRefresh();
-    } else {
-        // 页面不可见时，停止自动刷新
-        stopAutoRefresh();
-    }
-});
-
-function loadPostDetails(postId) {
-    window.apiCall(`/api/posts/${postId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // ... existing code ...
-            }
-        })
-        .catch(error => console.error('Error loading post details:', error));
-}
-
-function addComment(postId) {
-    const commentContent = document.getElementById('commentContent').value;
-    if (!commentContent.trim()) {
-        alert('コメントを入力してください。');
-        return;
-    }
-
-    window.apiCall(`/api/posts/${postId}/comments`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: commentContent })
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('commentContent').value = '';
-                loadPostDetails(postId);
-            } else {
-                alert('コメントの投稿に失敗しました。');
-            }
-        })
-        .catch(error => console.error('Error adding comment:', error));
-}
-
-function createTag() {
-    const tagName = document.getElementById('newTagName').value;
-    const tagColor = document.getElementById('newTagColor').value;
-
-    if (!tagName.trim()) {
-        alert('タグ名を入力してください。');
-        return;
-    }
-
-    window.apiCall('/api/tags', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name: tagName, color: tagColor })
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('newTagName').value = '';
-                document.getElementById('newTagColor').value = '';
-                loadTags();
-                hideTagModal();
-            } else {
-                alert('タグの作成に失敗しました。');
-            }
-        })
-        .catch(error => console.error('Error creating tag:', error));
-} 
+// 移除自动刷新相关的监听器
+document.removeEventListener('visibilitychange', () => { }); 

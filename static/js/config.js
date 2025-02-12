@@ -8,7 +8,7 @@
     const configs = {
         development: {
             API_CONFIG: {
-                BASE_URL: '',
+                BASE_URL: '',  // 开发环境下为空
                 STAGE: 'dev'
             },
             S3_CONFIG: {
@@ -55,7 +55,9 @@
     // 获取 API URL
     function getApiUrl(endpoint) {
         const baseUrl = config.API_CONFIG.BASE_URL;
-        return baseUrl ? `${baseUrl}/${endpoint}`.replace(/\/+/g, '/') : endpoint;
+        // 确保endpoint以/开头
+        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        return baseUrl ? `${baseUrl}${normalizedEndpoint}` : normalizedEndpoint;
     }
 
     // 导出配置
@@ -63,6 +65,50 @@
         ...config,
         getAssetUrl,
         getApiUrl
+    };
+
+    // API 调用函数
+    window.apiCall = function (endpoint, options = {}) {
+        // 获取 CSRF token
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        // 构建完整的 URL
+        const url = getApiUrl(endpoint);
+        console.log('API Call URL:', url);  // 添加调试日志
+
+        // 默认选项
+        const defaultOptions = {
+            credentials: 'same-origin',  // 包含 cookies
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            }
+        };
+
+        // 合并选项
+        const finalOptions = {
+            ...defaultOptions,
+            ...options,
+            headers: {
+                ...defaultOptions.headers,
+                ...(options.headers || {})
+            }
+        };
+
+        console.log('API Call Options:', finalOptions);  // 添加调试日志
+
+        // 发起请求
+        return fetch(url, finalOptions)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response;
+            })
+            .catch(error => {
+                console.error('API call failed:', error);
+                throw error;
+            });
     };
 })();
 
