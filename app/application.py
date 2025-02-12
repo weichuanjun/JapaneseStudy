@@ -4,31 +4,40 @@ import json
 import time
 import random
 import os
+# 检查是否在 Lambda 环境中
+is_lambda = bool(os.environ.get('AWS_LAMBDA_FUNCTION_NAME'))
 import azure.cognitiveservices.speech as speechsdk
+try:
+    import boto3
+    AWS_AVAILABLE = True
+except ImportError:
+    AWS_AVAILABLE = False
+    print("AWS SDK not available. AWS features will be disabled.")
 import logging
 import google.generativeai as genai
-import boto3
 from flask_migrate import Migrate
-from config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE, GEMINI_API_KEY, GEMINI_MODEL, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS, SQLALCHEMY_ENGINE_OPTIONS, config
+from app.config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE, GEMINI_API_KEY, GEMINI_MODEL, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS, SQLALCHEMY_ENGINE_OPTIONS, config
 from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash, g
-from models import db, User, ReadingRecord, TopicRecord
+from app.models import db, User, ReadingRecord, TopicRecord
 from functools import wraps
-from vocabulary import vocabulary_bp
-from forum import forum_bp
-from profile import profile_bp
+from app.vocabulary import vocabulary_bp
+from app.forum import forum_bp
+from app.profile import profile_bp
 from werkzeug.utils import secure_filename
 from PIL import Image
 from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
-from ai_advisor import get_greeting, get_learning_advice
+from app.ai_advisor import get_greeting, get_learning_advice
 from io import BytesIO
-from jinja2 import BaseLoader, TemplateNotFound
+from jinja2 import BaseLoader, TemplateNotFound, FileSystemLoader
 from dotenv import load_dotenv
 
 class S3TemplateLoader(BaseLoader):
     def __init__(self, bucket_name):
+        if not AWS_AVAILABLE:
+            raise ImportError("AWS SDK (boto3) is not available")
         self.s3 = boto3.client('s3')
         self.bucket = bucket_name
 
@@ -46,10 +55,13 @@ def create_app(config_name='default'):
     # 加载环境变量
     load_dotenv()
     
+    # 获取项目根目录的路径
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
     app = Flask(__name__,
-                static_folder='static',
+                static_folder=os.path.join(root_dir, 'static'),
                 static_url_path='/static',
-                template_folder='templates')
+                template_folder=os.path.join(root_dir, 'templates'))
 
     # 设置基本配置
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_key')
@@ -89,26 +101,45 @@ def create_app(config_name='default'):
     @app.context_processor
     def utility_processor():
         env = os.getenv('FLASK_ENV', 'development')
+        is_production = env == 'production'
+        
         config = {
-            'API_BASE_URL': os.getenv('API_BASE_URL', ''),
-            'STATIC_BASE_URL': os.getenv('STATIC_BASE_URL', '/static'),
-            'CLOUDFRONT_DOMAIN': os.getenv('CLOUDFRONT_DOMAIN', ''),
+            'API_CONFIG': {
+                'BASE_URL': os.getenv('API_BASE_URL', ''),
+                'STAGE': 'dev' if env == 'development' else 'prod'
+            },
+            'S3_CONFIG': {
+                'BUCKET_URL': os.getenv('STATIC_BASE_URL', '/static'),
+                'CLOUDFRONT_URL': os.getenv('CLOUDFRONT_DOMAIN', '')
+            },
+            'ENV': {
+                'IS_PRODUCTION': is_production,
+                'USE_CLOUDFRONT': is_production
+            },
             'AZURE_REGION': os.getenv('AZURE_REGION', ''),
             'SUBSCRIPTION_KEY': os.getenv('SUBSCRIPTION_KEY', ''),
-            'ENV': env
+            'FLASK_ENV': env
         }
         
         def static_url(filename):
             """生成静态文件URL"""
-            if env == 'production':
+            if is_production:
                 return f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/static/{filename}"
             return url_for('static', filename=filename)
                 
         def asset_url(filename):
             """生成资源文件URL"""
-            if env == 'production':
+            if is_production:
                 return f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/{filename}"
             return url_for('static', filename=filename)
+        
+        def get_asset_url(path):
+            """生成资源URL"""
+            if is_production:
+                return f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/{path}"
+            return path
+                
+        config['getAssetUrl'] = get_asset_url
                 
         return dict(
             static_url=static_url,
@@ -386,31 +417,10 @@ def create_app(config_name='default'):
         
         return response.json()
 
-    @app.route("/gettonguetwister", methods=["POST"])
-    def gettonguetwister():
-        tonguetwisters = [
-            "お世話になっております。",
-            "ご確認のほどよろしくお願いいたします。",
-            "お手数をおかけしますが、よろしくお願いいたします。",
-            "ご返信お待ちしております。",
-            "ご指摘いただきありがとうございます。",
-            "お忙しいところ恐縮ですが、ご確認ください。",
-            "ご協力いただきありがとうございます。",
-            "今後ともよろしくお願いいたします。",
-            "お時間をいただきありがとうございます。",
-            "ご理解のほどよろしくお願いいたします。",
-            "お手数ですが、再度ご確認ください。",
-            "ご不明な点がございましたら、お知らせください。",
-            "お手数をおかけいたしますが、何卒よろしくお願いいたします。",
-            "ご対応いただきありがとうございます。",
-            "お返事をお待ちしております。",
-            "ご確認いただきありがとうございます。"
-        ]
-        
-        return jsonify({"tt":random.choice(tonguetwisters)})
 
     @app.route("/gettts", methods=["POST"])
     def gettts():
+
         reftext = request.form.get("reftext")
         # Creates an instance of a speech config with specified subscription key and service region.
         speech_config = speechsdk.SpeechConfig(subscription=SUBSCRIPTION_KEY, region=REGION)

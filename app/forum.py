@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for, current_app
-from models import db, Post, Comment, User, Tag, AIMemory, AIRelationship, AIPersonality, AIInteraction, AffinityHistory
+from app.models import db, Post, Comment, User, Tag, AIMemory, AIRelationship, AIPersonality, AIInteraction, AffinityHistory
 import google.generativeai as genai
-from config import GEMINI_API_KEY, GEMINI_MODEL
+from app.config import GEMINI_API_KEY, GEMINI_MODEL
 import logging
 from datetime import datetime
 from functools import wraps
@@ -13,15 +13,12 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 import os
 import sys
 
-# 确保logs目录存在
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-
+# 配置日志
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(sys.stdout)
+        logging.StreamHandler(sys.stdout),  # 使用标准输出流
     ]
 )
 
@@ -244,7 +241,7 @@ def generate_ai_response(content, post_id=None, user_id=None):
         ai_personality = AIPersonality.query.first()
         if not ai_personality:
             try:
-                from ai_personality_init import init_ai_personality
+                from app.ai_personality_init import init_ai_personality
                 init_ai_personality()
                 ai_personality = AIPersonality.query.first()
                 if not ai_personality:
@@ -1038,7 +1035,7 @@ def momo_profile():
         # 获取 AI 人格设定
         ai_personality = AIPersonality.query.first()
         if not ai_personality:
-            from ai_personality_init import init_ai_personality
+            from app.ai_personality_init import init_ai_personality
             init_ai_personality()
             ai_personality = AIPersonality.query.first()
         

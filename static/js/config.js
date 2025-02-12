@@ -1,44 +1,108 @@
 // 前端环境配置
 (function () {
     const env = document.querySelector('meta[name="environment"]')?.content || 'development';
+    const apiBaseUrl = document.querySelector('meta[name="api-base-url"]')?.content;
+    const staticBaseUrl = document.querySelector('meta[name="static-base-url"]')?.content;
+    const cloudfrontDomain = document.querySelector('meta[name="cloudfront-domain"]')?.content;
 
     const configs = {
         development: {
-            API_BASE_URL: '',  // 本地开发使用相对路径
-            STATIC_BASE_URL: '/static',
-            CLOUDFRONT_DOMAIN: '',
-            AZURE_REGION: document.querySelector('meta[name="azure-region"]')?.content,
-            SUBSCRIPTION_KEY: document.querySelector('meta[name="subscription-key"]')?.content
+            API_CONFIG: {
+                BASE_URL: '',
+                STAGE: 'dev'
+            },
+            S3_CONFIG: {
+                BUCKET_NAME: 'jp-study',
+                REGION: 'ap-northeast-1',
+                BUCKET_URL: '/static',
+                CLOUDFRONT_URL: ''
+            },
+            ENV: {
+                IS_PRODUCTION: false,
+                USE_CLOUDFRONT: false
+            }
         },
         production: {
-            API_BASE_URL: document.querySelector('meta[name="api-base-url"]')?.content,
-            STATIC_BASE_URL: document.querySelector('meta[name="static-base-url"]')?.content,
-            CLOUDFRONT_DOMAIN: document.querySelector('meta[name="cloudfront-domain"]')?.content,
-            AZURE_REGION: document.querySelector('meta[name="azure-region"]')?.content,
-            SUBSCRIPTION_KEY: document.querySelector('meta[name="subscription-key"]')?.content
+            API_CONFIG: {
+                BASE_URL: apiBaseUrl || 'https://xlyfeojyl0.execute-api.ap-northeast-1.amazonaws.com/jp-study',
+                STAGE: 'Prod'
+            },
+            S3_CONFIG: {
+                BUCKET_NAME: 'jp-study',
+                REGION: 'ap-northeast-1',
+                BUCKET_URL: `https://jp-study.s3.ap-northeast-1.amazonaws.com`,
+                CLOUDFRONT_URL: cloudfrontDomain || 'https://d3mnw1kshao4eu.cloudfront.net'
+            },
+            ENV: {
+                IS_PRODUCTION: true,
+                USE_CLOUDFRONT: true
+            }
         }
     };
 
-    window.APP_CONFIG = configs[env];
+    const config = configs[env];
 
-    // 添加全局 API 调用函数
-    window.apiCall = function (endpoint, options = {}) {
-        const baseUrl = window.APP_CONFIG.API_BASE_URL;
-        const url = baseUrl ? `${baseUrl}${endpoint}` : endpoint;
+    // 获取资源 URL
+    function getAssetUrl(path) {
+        if (config.ENV.USE_CLOUDFRONT && config.ENV.IS_PRODUCTION) {
+            return `${config.S3_CONFIG.CLOUDFRONT_URL}/${path}`;
+        }
+        return config.ENV.IS_PRODUCTION
+            ? `${config.S3_CONFIG.BUCKET_URL}/${path}`
+            : path;
+    }
 
-        const defaultOptions = {
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content
-            }
-        };
+    // 获取 API URL
+    function getApiUrl(endpoint) {
+        const baseUrl = config.API_CONFIG.BASE_URL;
+        return baseUrl ? `${baseUrl}/${endpoint}`.replace(/\/+/g, '/') : endpoint;
+    }
 
-        return fetch(url, { ...defaultOptions, ...options });
+    // 导出配置
+    window.APP_CONFIG = {
+        ...config,
+        getAssetUrl,
+        getApiUrl
     };
+})();
 
-    // 添加全局静态资源 URL 生成函数
-    window.staticUrl = function (path) {
-        return `${window.APP_CONFIG.STATIC_BASE_URL}/${path}`;
-    };
-})(); 
+// API Gateway 配置
+const API_CONFIG = {
+    BASE_URL: 'https://xlyfeojyl0.execute-api.ap-northeast-1.amazonaws.com/jp-study',
+    STAGE: 'Prod'
+};
+
+// S3 配置
+const S3_CONFIG = {
+    BUCKET_NAME: 'japanese-study-static-files',
+    REGION: 'ap-northeast-1',
+    CLOUDFRONT_URL: 'https://d3mnw1kshao4eu.cloudfront.net'
+};
+
+// 环境配置
+const ENV = {
+    IS_PRODUCTION: true,
+    USE_CLOUDFRONT: true
+};
+
+// 获取资源 URL
+function getAssetUrl(path) {
+    if (ENV.USE_CLOUDFRONT && ENV.IS_PRODUCTION) {
+        return `https://${S3_CONFIG.CLOUDFRONT_URL}/${path}`;
+    }
+    return path;
+}
+
+// 获取 API URL
+function getApiUrl(endpoint) {
+    return `${API_CONFIG.BASE_URL}/${endpoint}`.replace(/\/+/g, '/');
+}
+
+// 导出配置
+window.APP_CONFIG = {
+    API_CONFIG,
+    S3_CONFIG,
+    ENV,
+    getAssetUrl,
+    getApiUrl
+}; 

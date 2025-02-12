@@ -6,19 +6,19 @@
     <title>{% block title %}{% endblock %}</title>
     
     <!-- 环境配置 -->
-    <meta name="environment" content="{{ env }}">
-    <meta name="api-base-url" content="{{ config.API_BASE_URL }}">
-    <meta name="static-base-url" content="{{ config.STATIC_BASE_URL }}">
-    <meta name="cloudfront-domain" content="{{ config.CLOUDFRONT_DOMAIN }}">
+    <meta name="environment" content="{{ config.FLASK_ENV }}">
+    <meta name="api-base-url" content="{{ config.API_CONFIG.BASE_URL }}">
+    <meta name="static-base-url" content="{{ config.S3_CONFIG.CLOUDFRONT_URL if config.ENV.USE_CLOUDFRONT else config.S3_CONFIG.BUCKET_URL }}">
+    <meta name="cloudfront-domain" content="{{ config.S3_CONFIG.CLOUDFRONT_URL }}">
     <meta name="azure-region" content="{{ config.AZURE_REGION }}">
     <meta name="subscription-key" content="{{ config.SUBSCRIPTION_KEY }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <!-- 配置文件 -->
-    <script src="{{ static_url('js/config.js') }}"></script>
+    <script src="{{ config.getAssetUrl('static/js/config.js') }}"></script>
     
     <!-- CSS 文件 -->
-    <link rel="stylesheet" href="{{ static_url('css/style.css') }}">
+    <link rel="stylesheet" href="{{ config.getAssetUrl('static/css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     {% block extra_css %}{% endblock %}
     <style>
@@ -185,6 +185,7 @@
 
     {% block scripts %}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ config.getAssetUrl('static/js/index.js') }}"></script>
     {% endblock %}
 
     {% if current_user %}

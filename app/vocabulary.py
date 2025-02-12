@@ -1,13 +1,13 @@
 from flask import Blueprint, jsonify, request, render_template
-from models import db, VocabularyRecord, Vocabulary
+from app.models import db, VocabularyRecord, Vocabulary
 from sqlalchemy import text
 import json
 import logging
 import time
-import google.generativeai as genai
-from config import GEMINI_API_KEY, GEMINI_MODEL
-import random
 import sys
+import google.generativeai as genai
+from app.config import GEMINI_API_KEY, GEMINI_MODEL
+import random
 
 # 设置日志
 logging.basicConfig(
@@ -18,6 +18,9 @@ logging.basicConfig(
     ]
 )
 
+# 创建蓝图
+vocabulary_bp = Blueprint('vocabulary', __name__)
+
 # 配置 Gemini API
 try:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -25,8 +28,6 @@ try:
 except Exception as e:
     logging.error(f"Gemini API 配置失败: {str(e)}")
     raise
-
-vocabulary_bp = Blueprint('vocabulary', __name__)
 
 CATEGORIES = {
     'n1': 'JLPT N1 词汇',

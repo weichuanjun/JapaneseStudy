@@ -1,12 +1,12 @@
-import os
-import base64
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
+from app.models import db, User
+from PIL import Image
 from io import BytesIO
-from flask import Blueprint, render_template, request, jsonify, current_app, session, flash, redirect, url_for
+import base64
+import os
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, DateField, SelectField, TextAreaField
-from models import db, User
-from PIL import Image
 from datetime import datetime
 from functools import wraps
 

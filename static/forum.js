@@ -16,7 +16,7 @@ function generatePastelColor() {
 
 // 加载标签列表
 function loadTags() {
-    window.apiCall('/forum/api/tags')
+    window.apiCall('/api/tags')
         .then(response => response.json())
         .then(tags => {
             // 更新标签筛选器
@@ -97,7 +97,7 @@ function showUserInfo(userId, clickEvent) {
         currentPopupCloseHandler = null;
     }
 
-    window.apiCall(`/forum/api/user/${userId}`)
+    window.apiCall(`/api/user/${userId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -262,37 +262,20 @@ function hideUserInfoPopup() {
 
 // 加载用户的帖子列表
 function loadUserPosts(userId) {
-    window.apiCall(`/forum/api/user/${userId}/posts`)
+    window.apiCall(`/api/user/${userId}/posts`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 const postsContainer = document.getElementById('forumPopupPosts');
                 postsContainer.innerHTML = '';
-
-                if (data.posts.length === 0) {
-                    postsContainer.innerHTML = '<div class="no-posts">投稿はありません</div>';
-                    return;
-                }
-
                 data.posts.forEach(post => {
                     const postElement = document.createElement('div');
-                    postElement.className = 'user-post-item';
+                    postElement.className = 'popup-post-item';
                     postElement.innerHTML = `
-                        <div class="user-post-title">${post.title}</div>
-                        <div class="user-post-meta">
-                            <span class="user-post-time">${formatDate(post.created_at)}</span>
-                            <span class="user-post-comments">
-                                <i class="fas fa-comment"></i>
-                                ${post.comment_count}
-                            </span>
-                        </div>
+                        <div class="popup-post-title">${post.title}</div>
+                        <div class="popup-post-date">${post.created_at}</div>
                     `;
-
-                    // 添加点击事件，打开帖子详情
-                    postElement.addEventListener('click', () => {
-                        openPostDetail(post.id);
-                    });
-
+                    postElement.onclick = () => loadPostDetails(post.id);
                     postsContainer.appendChild(postElement);
                 });
             }
@@ -356,10 +339,9 @@ function loadPosts(page = 1) {
     // 更新当前页码
     currentPage = page;
 
-    let url = `/forum/api/posts?page=${page}&per_page=20`;
-    if (currentFilterTag) {
-        url += `&tag_id=${currentFilterTag}`;
-    }
+    const url = currentFilterTag
+        ? `/api/posts?page=${page}&tag=${currentFilterTag}`
+        : `/api/posts?page=${page}`;
 
     window.apiCall(url)
         .then(response => response.json())
@@ -654,7 +636,7 @@ function openPostDetail(postId) {
 function loadPostDetail() {
     if (!currentPostId) return;
 
-    window.apiCall(`/forum/api/posts/${currentPostId}`)
+    window.apiCall(`/api/posts/${currentPostId}`)
         .then(response => response.json())
         .then(post => {
             if (post.error) {
@@ -722,7 +704,7 @@ function loadComments(postId) {
         return;
     }
 
-    window.apiCall(`/forum/api/posts/${postId}/comments`)
+    window.apiCall(`/api/posts/${postId}/comments`)
         .then(response => response.json())
         .then(comments => {
             if (Array.isArray(comments)) {
@@ -753,7 +735,7 @@ function handleNewPostSubmit(e) {
         return;
     }
 
-    window.apiCall('/forum/api/posts', {
+    window.apiCall('/api/posts', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -810,7 +792,7 @@ function handleNewCommentSubmit(e) {
         return;
     }
 
-    window.apiCall(`/forum/api/posts/${currentPostId}/comments`, {
+    window.apiCall(`/api/posts/${currentPostId}/comments`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -929,7 +911,7 @@ document.getElementById('addTagBtn').addEventListener('click', function () {
     if (!tagName) return;
 
     // 检查是否已存在该标签
-    window.apiCall('/forum/api/tags', {
+    window.apiCall('/api/tags', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -989,7 +971,7 @@ function startAutoRefresh() {
     // 每3秒刷新一次
     autoRefreshInterval = setInterval(() => {
         if (document.visibilityState === 'visible') {  // 只在页面可见时刷新
-            window.apiCall(`/forum/api/posts?page=${currentPage}&per_page=20${currentFilterTag ? `&tag_id=${currentFilterTag}` : ''}`)
+            window.apiCall(`/api/posts?page=${currentPage}&per_page=20${currentFilterTag ? `&tag_id=${currentFilterTag}` : ''}`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.posts) return;
@@ -1061,4 +1043,71 @@ document.addEventListener('visibilitychange', () => {
         // 页面不可见时，停止自动刷新
         stopAutoRefresh();
     }
-}); 
+});
+
+function loadPostDetails(postId) {
+    window.apiCall(`/api/posts/${postId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // ... existing code ...
+            }
+        })
+        .catch(error => console.error('Error loading post details:', error));
+}
+
+function addComment(postId) {
+    const commentContent = document.getElementById('commentContent').value;
+    if (!commentContent.trim()) {
+        alert('コメントを入力してください。');
+        return;
+    }
+
+    window.apiCall(`/api/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: commentContent })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('commentContent').value = '';
+                loadPostDetails(postId);
+            } else {
+                alert('コメントの投稿に失敗しました。');
+            }
+        })
+        .catch(error => console.error('Error adding comment:', error));
+}
+
+function createTag() {
+    const tagName = document.getElementById('newTagName').value;
+    const tagColor = document.getElementById('newTagColor').value;
+
+    if (!tagName.trim()) {
+        alert('タグ名を入力してください。');
+        return;
+    }
+
+    window.apiCall('/api/tags', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: tagName, color: tagColor })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('newTagName').value = '';
+                document.getElementById('newTagColor').value = '';
+                loadTags();
+                hideTagModal();
+            } else {
+                alert('タグの作成に失敗しました。');
+            }
+        })
+        .catch(error => console.error('Error creating tag:', error));
+} 

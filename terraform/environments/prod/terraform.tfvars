@@ -1,8 +1,0 @@
-aws_region = "ap-northeast-1"
-project_name = "japanese-study"
-environment = "prod"
-domain_name = "japanese-study.example.com"
-frontend_bucket_name = "japanese-study-prod-static"
-vpc_cidr = "10.0.0.0/16"
-db_name = "japanese_study"
-db_master_username = "admin" 

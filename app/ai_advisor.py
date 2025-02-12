@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from datetime import datetime
-from models import db, ReadingRecord, TopicRecord
-from config import GEMINI_API_KEY, GEMINI_MODEL
+from app.models import db, ReadingRecord, TopicRecord
+from app.config import GEMINI_API_KEY, GEMINI_MODEL
 import logging
 
 # 配置日志

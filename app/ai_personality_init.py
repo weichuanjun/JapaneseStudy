@@ -1,4 +1,4 @@
-from models import db, AIPersonality
+from app.models import db, AIPersonality
 
 def init_ai_personality():
     """初始化AI助手的人格设定"""
