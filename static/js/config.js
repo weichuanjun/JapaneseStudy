@@ -112,11 +112,17 @@
     };
 })();
 
-// API Gateway 配置
-const API_CONFIG = {
-    BASE_URL: 'https://xlyfeojyl0.execute-api.ap-northeast-1.amazonaws.com/jp-study',
-    STAGE: 'Prod'
-};
+// Function to get API configuration
+// Assumes a global object like window.APP_CONFIG exists, injected from the backend HTML template
+function getApiConfig() {
+    if (window.APP_CONFIG && window.APP_CONFIG.API_CONFIG) {
+        return window.APP_CONFIG.API_CONFIG;
+    } else {
+        console.error("API configuration not found in window.APP_CONFIG");
+        // Provide default or fallback values if necessary, or throw an error
+        return { BASE_URL: '', STAGE: '' };
+    }
+}
 
 // S3 配置
 const S3_CONFIG = {
@@ -151,4 +157,13 @@ window.APP_CONFIG = {
     ENV,
     getAssetUrl,
     getApiUrl
+};
+
+// Export functions if needed, but not the API_CONFIG constant itself
+export {
+    apiCall,
+    createHeaders,
+    handleApiError,
+    buildApiUrl // Assuming getApiConfig is used internally or API_CONFIG is passed around
+    // getApiConfig // Optionally export if needed elsewhere
 }; 

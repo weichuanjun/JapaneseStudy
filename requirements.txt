@@ -1,3 +1,6 @@
+# Serverless deployment
+serverless-wsgi
+
 # Flask and extensions
 Flask==2.0.1
 Flask-SQLAlchemy==2.5.1
@@ -34,4 +37,12 @@ google-ai-generativelanguage==0.4.0
 google-auth==2.27.0
 
 azure-cognitiveservices-speech==1.34.0
+
+# # 请在此处添加你的项目所需的其他依赖项，例如：
+# # SQLAlchemy
+# # Flask-SQLAlchemy
+# # requests
+# # boto3
+# # python-dotenv
+# # ...
 

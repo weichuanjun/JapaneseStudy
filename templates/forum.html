@@ -3,7 +3,7 @@
 {% block title %}掲示板 - 日本語学習{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/forum.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/forum.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -165,7 +165,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/forum.js') }}"></script>
+<script src="{{ static_url('js/forum.js') }}"></script>
 <script>
     // 调试信息
     console.log('Forum page loaded');

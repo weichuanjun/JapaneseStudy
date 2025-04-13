@@ -1,0 +1,25 @@
+{
+  "name": "japanesestudy",
+  "version": "1.0.0",
+  "description": "一个现代化的日语学习平台，集成了 AI 技术，提供多样化的学习体验。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weichuanjun/JapaneseStudy.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/weichuanjun/JapaneseStudy/issues"
+  },
+  "homepage": "https://github.com/weichuanjun/JapaneseStudy#readme",
+  "devDependencies": {
+    "serverless": "^4.9.0",
+    "serverless-python-requirements": "^6.1.2",
+    "serverless-wsgi": "^3.0.5"
+  }
+}

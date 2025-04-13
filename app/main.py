@@ -14,10 +14,11 @@ def login_required(f):
 
 @main_bp.route('/')
 @main_bp.route('/index')
-@login_required
+# @login_required # 本地测试时暂时注释掉
 def index():
     active_tab = request.args.get('active_tab', 'dashboard')
-    current_user = User.query.get(session['user_id'])
+    user_id = session.get('user_id') # 安全获取
+    current_user = User.query.get(user_id) if user_id else None # 处理未登录情况
     return render_template('index.html', 
                          active_tab=active_tab, 
                          current_user=current_user) 

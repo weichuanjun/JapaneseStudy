@@ -14,11 +14,11 @@
     <meta name="subscription-key" content="{{ config.SUBSCRIPTION_KEY }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
-    <!-- 配置文件 -->
-    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+    <!-- 配置文件 (使用 static_url) -->
+    <script src="{{ static_url('js/config.js') }}"></script>
     
-    <!-- CSS 文件 -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- CSS 文件 (使用 static_url) -->
+    <link rel="stylesheet" href="{{ static_url('css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     {% block extra_css %}{% endblock %}
     <style>
@@ -186,8 +186,8 @@
     <!-- 基础 JavaScript 库 -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
-    <!-- 配置和工具 -->
-    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+    <!-- 配置和工具 (移除重复的 config.js 引用) -->
+    <!-- <script src="{{ static_url('js/config.js') }}"></script> -->
     
     <!-- 页面特定的 JavaScript -->
     {% block scripts %}{% endblock %}
@@ -238,7 +238,13 @@
         $.ajaxSetup({
             beforeSend: function(xhr, settings) {
                 if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
-                    xhr.setRequestHeader("X-CSRFToken", $('meta[name="csrf-token"]').attr('content'));
+                    // Ensure meta tag exists before trying to access its content
+                    const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                    if (csrfTokenMeta) {
+                        xhr.setRequestHeader("X-CSRFToken", csrfTokenMeta.getAttribute('content'));
+                    } else {
+                        console.warn('CSRF meta tag not found.');
+                    }
                 }
             }
         });

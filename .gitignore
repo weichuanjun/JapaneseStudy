@@ -80,3 +80,6 @@ migrations/
 .env.*
 env.json
 *.env
+node_modules/
+.serverless
+serverless.yml

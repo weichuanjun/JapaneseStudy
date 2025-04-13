@@ -30,8 +30,6 @@ from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.ai_advisor import get_greeting, get_learning_advice
-from io import BytesIO
 from jinja2 import BaseLoader, TemplateNotFound, FileSystemLoader
 from dotenv import load_dotenv
 
@@ -53,6 +51,10 @@ class S3TemplateLoader(BaseLoader):
             raise TemplateNotFound(template)
 
 def create_app(config_name='default'):
+    # 设置日志级别为 DEBUG
+    logging.basicConfig(level=logging.DEBUG, 
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
     # 加载环境变量
     load_dotenv()
     
@@ -64,35 +66,42 @@ def create_app(config_name='default'):
                 static_url_path='/static',
                 template_folder=os.path.join(root_dir, 'templates'))
 
-    # 设置基本配置
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev_key')
-    app.config['WTF_CSRF_SECRET_KEY'] = os.getenv('WTF_CSRF_SECRET_KEY', 'csrf_dev_key')
-    
-    # 设置数据库配置
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = os.getenv('SQLALCHEMY_TRACK_MODIFICATIONS', 'False').lower() == 'true'
-    
-    # 根据环境加载配置
-    if os.getenv('FLASK_ENV') == 'production':
-        app.config.from_object(config['production'])
-    else:
-        app.config.from_object(config['development'])
-    
-    # 从环境变量文件加载配置
-    if os.getenv('APP_CONFIG_FILE'):
-        app.config.from_pyfile(os.getenv('APP_CONFIG_FILE'))
+    # Load configuration based on FLASK_ENV
+    # This single call should set up all necessary configs from config.py
+    flask_env = os.getenv('FLASK_ENV', 'development')
+    app.config.from_object(config[flask_env])
 
-    # 配置允许的源
-    ALLOWED_ORIGINS = [
-        f"https://{os.getenv('API_GATEWAY_ID')}.execute-api.{os.getenv('AWS_REGION')}.amazonaws.com",
-        f"https://{os.getenv('CLOUDFRONT_DOMAIN')}",
+    # Explicitly set keys from environment if not handled by from_object (optional, but good practice)
+    # These might overwrite defaults set in Config classes if the env var exists
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', app.config.get('SECRET_KEY'))
+    app.config['WTF_CSRF_SECRET_KEY'] = os.getenv('WTF_CSRF_SECRET_KEY', app.config.get('WTF_CSRF_SECRET_KEY'))
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI', app.config.get('SQLALCHEMY_DATABASE_URI'))
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = os.getenv('SQLALCHEMY_TRACK_MODIFICATIONS', app.config.get('SQLALCHEMY_TRACK_MODIFICATIONS'))
+
+    # 配置允许的源 (Ensure required env vars are set in serverless.yml)
+    allowed_origins = []
+    api_gateway_origin = f"https://{os.getenv('API_GATEWAY_ID')}.execute-api.{os.getenv('AWS_DEFAULT_REGION', 'ap-northeast-1')}.amazonaws.com"
+    cloudfront_origin = f"https://{os.getenv('CLOUDFRONT_DOMAIN')}"
+    if os.getenv('API_GATEWAY_ID'):
+        allowed_origins.append(api_gateway_origin)
+    if os.getenv('CLOUDFRONT_DOMAIN'):
+        allowed_origins.append(cloudfront_origin)
+    allowed_origins.extend([
         "http://localhost:5000",
         "http://127.0.0.1:5000"
-    ]
+    ])
+    print(f"Allowed Origins: {allowed_origins}")
+    # You might need to configure CORS extension properly, e.g., using Flask-CORS
+    # CORS(app, origins=allowed_origins, supports_credentials=True)
 
     # 在生产环境中使用 S3 模板加载器
     if app.config['FLASK_ENV'] in ['production', 'prod']:
-        app.jinja_loader = S3TemplateLoader(os.getenv('S3_BUCKET'))
+        # Ensure S3_BUCKET is correctly set in the config
+        s3_bucket = app.config.get('S3_BUCKET')
+        if s3_bucket:
+            app.jinja_loader = S3TemplateLoader(s3_bucket)
+        else:
+            print("Warning: S3_BUCKET not configured for S3TemplateLoader in production.")
 
     # 配置上传目录
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'avatars')
@@ -149,16 +158,11 @@ def create_app(config_name='default'):
             config=config
         )
 
-    # 使用 config.py 中的数据库配置
-    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = SQLALCHEMY_ENGINE_OPTIONS
-
     # CSRF 保护配置
-    app.config['WTF_CSRF_ENABLED'] = False  # 暂时禁用 CSRF 保护
+    # app.config['WTF_CSRF_ENABLED'] = False # This might be False, but CSRFProtect() still provides the token macro
 
     # 添加 CSRF 保护
-    csrf = CSRFProtect(app)
+    csrf = CSRFProtect(app) # Restore CSRF initialization
 
     # 初始化数据库
     db.init_app(app)
@@ -298,15 +302,18 @@ def create_app(config_name='default'):
         return redirect(url_for('login'))
 
     @app.route('/index')
-    @login_required
+    # @login_required # 再次注释掉，以防干扰
     def index_redirect():
+        # Handle potential infinite redirect loop if user directly accesses /index
         return redirect(url_for('index', active_tab=request.args.get('active_tab', 'dashboard')))
 
     @app.route('/')
-    @login_required
+    # @login_required # 本地测试时暂时注释掉
     def index():
+        # 默认加载仪表板标签页
         active_tab = request.args.get('active_tab', 'dashboard')
-        current_user = User.query.get(session['user_id'])
+        user_id = session.get('user_id') # 使用 .get() 安全获取 user_id
+        current_user = User.query.get(user_id) if user_id else None # 如果 user_id 存在则查询用户，否则为 None
         return render_template('index.html', active_tab=active_tab, current_user=current_user)
 
     # 保存阅读练习记录
@@ -1107,6 +1114,7 @@ def create_app(config_name='default'):
     @app.route("/api/dashboard/greeting")
     @login_required
     def get_user_greeting():
+        from app.ai_advisor import get_greeting
         user = User.query.get(session['user_id'])
         return jsonify({
             "greeting": get_greeting(user.username)
@@ -1115,6 +1123,7 @@ def create_app(config_name='default'):
     @app.route("/api/dashboard/advice")
     @login_required
     def get_user_advice():
+        from app.ai_advisor import get_learning_advice
         try:
             logging.info(f"用户 {session['user_id']} 请求学习建议")
             advice = get_learning_advice(session['user_id'])
