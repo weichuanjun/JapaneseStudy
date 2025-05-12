@@ -3,7 +3,7 @@
 {% block title %}単語学習{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/vocabulary.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/vocabulary.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -579,7 +579,7 @@
 }
 </style>
 
-<script src="{{ url_for('static', filename='js/vocabulary.js') }}"></script>
+<script src="{{ static_url('js/vocabulary.js') }}"></script>
 <script>
     // 调试信息
     console.log('Vocabulary page loaded');

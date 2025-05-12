@@ -111,7 +111,7 @@ function showUserInfo(userId, clickEvent) {
                     elements.postCount.textContent = user.post_count || 0;
                     elements.commentCount.textContent = user.comment_count || 0;
                     elements.totalPractices.textContent = user.total_practices || 0;
-                    elements.totalStudyTime.textContent = `${user.total_study_time || 0}分`;
+                    elements.totalStudyTime.textContent = `0分`;
                     elements.streakDays.textContent = `${user.streak_days || 0}日`;
 
                     // 处理头像显示

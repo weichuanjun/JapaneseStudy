@@ -18,7 +18,7 @@ import google.generativeai as genai
 from flask_migrate import Migrate
 from app.config import SUBSCRIPTION_KEY, REGION, LANGUAGE, VOICE, GEMINI_API_KEY, GEMINI_MODEL, SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS, SQLALCHEMY_ENGINE_OPTIONS, config
 from flask import Flask, jsonify, render_template, request, make_response, redirect, url_for, session, flash, g
-from app.models import db, User, ReadingRecord, TopicRecord
+from app.models import db, User, ReadingRecord, TopicRecord, VocabularyRecord
 from functools import wraps
 from app.vocabulary import vocabulary_bp
 from app.forum import forum_bp
@@ -32,6 +32,9 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from jinja2 import BaseLoader, TemplateNotFound, FileSystemLoader
 from dotenv import load_dotenv
+import sys
+from sqlalchemy.orm import joinedload
+from sqlalchemy import func, case # Import func for count calculations and case for conditional avg
 
 class S3TemplateLoader(BaseLoader):
     def __init__(self, bucket_name):
@@ -54,10 +57,12 @@ def create_app(config_name='default'):
     # 设置日志级别为 DEBUG
     logging.basicConfig(level=logging.DEBUG, 
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    print("[DEBUG] create_app: Starting app creation.") # DEBUG START
     
     # 加载环境变量
     load_dotenv()
-    
+    print(f"[DEBUG] create_app: FLASK_ENV='{os.getenv('FLASK_ENV')}', CLOUDFRONT_DOMAIN='{os.getenv('CLOUDFRONT_DOMAIN')}'") # DEBUG ENV VARS
+
     # 获取项目根目录的路径
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
@@ -65,18 +70,23 @@ def create_app(config_name='default'):
                 static_folder=os.path.join(root_dir, 'static'),
                 static_url_path='/static',
                 template_folder=os.path.join(root_dir, 'templates'))
+    print("[DEBUG] create_app: Flask app instance created.") # DEBUG FLASK INSTANCE
 
     # Load configuration based on FLASK_ENV
-    # This single call should set up all necessary configs from config.py
     flask_env = os.getenv('FLASK_ENV', 'development')
-    app.config.from_object(config[flask_env])
+    try:
+        app.config.from_object(config[flask_env])
+        print(f"[DEBUG] create_app: Configuration loaded for env '{flask_env}'.") # DEBUG CONFIG LOAD
+    except KeyError:
+        print(f"[ERROR] create_app: Invalid FLASK_ENV or config_name '{flask_env}'. Using default.")
+        app.config.from_object(config['default'])
 
-    # Explicitly set keys from environment if not handled by from_object (optional, but good practice)
-    # These might overwrite defaults set in Config classes if the env var exists
+    # Explicitly set/override keys from environment (redundant if Config class handles it, but safe)
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', app.config.get('SECRET_KEY'))
     app.config['WTF_CSRF_SECRET_KEY'] = os.getenv('WTF_CSRF_SECRET_KEY', app.config.get('WTF_CSRF_SECRET_KEY'))
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI', app.config.get('SQLALCHEMY_DATABASE_URI'))
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = os.getenv('SQLALCHEMY_TRACK_MODIFICATIONS', app.config.get('SQLALCHEMY_TRACK_MODIFICATIONS'))
+    print(f"[DEBUG] create_app: Final DB URI = {app.config.get('SQLALCHEMY_DATABASE_URI')}") # DEBUG DB URI
 
     # 配置允许的源 (Ensure required env vars are set in serverless.yml)
     allowed_origins = []
@@ -90,7 +100,7 @@ def create_app(config_name='default'):
         "http://localhost:5000",
         "http://127.0.0.1:5000"
     ])
-    print(f"Allowed Origins: {allowed_origins}")
+    print(f"[DEBUG] create_app: Allowed Origins = {allowed_origins}")
     # You might need to configure CORS extension properly, e.g., using Flask-CORS
     # CORS(app, origins=allowed_origins, supports_credentials=True)
 
@@ -110,52 +120,128 @@ def create_app(config_name='default'):
     # 注册上下文处理器
     @app.context_processor
     def utility_processor():
+        print("[DEBUG] utility_processor: Context processor called.") # DEBUG PROCESSOR START
         env = os.getenv('FLASK_ENV', 'development')
         is_production = env == 'production'
-        
-        config = {
+        # print(f"[DEBUG] utility_processor: FLASK_ENV='{env}', is_production={is_production}") # Already printed
+
+        config_data = { # Renamed to avoid confusion with the module
             'API_CONFIG': {
                 'BASE_URL': os.getenv('API_BASE_URL', ''),
                 'STAGE': 'dev' if env == 'development' else 'prod'
             },
             'S3_CONFIG': {
-                'BUCKET_URL': os.getenv('STATIC_BASE_URL', '/static'),
-                'CLOUDFRONT_URL': os.getenv('CLOUDFRONT_DOMAIN', '')
+                'BUCKET_URL': os.getenv('STATIC_BASE_URL', '/static'), # Might not be used if CLOUDFRONT_DOMAIN is set
+                'CLOUDFRONT_URL': os.getenv('CLOUDFRONT_DOMAIN', '') # Env var is CLOUDFRONT_DOMAIN
             },
             'ENV': {
                 'IS_PRODUCTION': is_production,
-                'USE_CLOUDFRONT': is_production
+                'USE_CLOUDFRONT': is_production and bool(os.getenv('CLOUDFRONT_DOMAIN'))
             },
             'AZURE_REGION': os.getenv('AZURE_REGION', ''),
             'SUBSCRIPTION_KEY': os.getenv('SUBSCRIPTION_KEY', ''),
             'FLASK_ENV': env
         }
-        
+        # print(f"[DEBUG] utility_processor: config_data={config_data}") # Already printed
+
         def static_url(filename):
-            """生成静态文件URL"""
-            if is_production:
-                return f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/static/{filename}"
-            return url_for('static', filename=filename)
-                
+            cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN')
+            final_url = ""
+            env = os.getenv('FLASK_ENV', 'development') # Get env inside function for safety
+            is_production = env == 'production'
+
+            print(f"[DEBUG] static_url: filename='{filename}', env='{env}', is_prod={is_production}, domain='{cloudfront_domain}'")
+
+            # --- 修改后的逻辑 --- 
+            # 只要 CLOUDFRONT_DOMAIN 环境变量存在，就优先使用它
+            if cloudfront_domain:
+                final_url = f"https://{cloudfront_domain}/static/{filename}"
+                print(f"[DEBUG] static_url: Using CloudFront domain.")
+            else:
+                # 否则，回退到 Flask 的 url_for 或相对路径
+                print(f"[DEBUG] static_url: CloudFront domain not found or empty. Falling back.")
+                try:
+                    with app.app_context(): # Ensure we are in app context for url_for
+                         if 'static' in app.view_functions:
+                             final_url = url_for('static', filename=filename, _external=False)
+                         else:
+                             print("[WARN] static_url: 'static' endpoint not found.")
+                             final_url = f"/static/{filename}"
+                except Exception as e:
+                    print(f"[ERROR] static_url: Error generating url_for: {e}")
+                    final_url = f"/static/{filename}"
+            # --- 结束修改后的逻辑 ---
+
+            print(f"[DEBUG] static_url: Generated URL for '{filename}' = '{final_url}'")
+            return final_url
+
+        # --- Add new page_url function --- 
+        def page_url(endpoint, **values):
+            cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN')
+            env = os.getenv('FLASK_ENV', 'development')
+            final_url = ""
+
+            print(f"[DEBUG] page_url: endpoint='{endpoint}', values={values}, env='{env}', domain='{cloudfront_domain}'")
+
+            # Generate the path using Flask's url_for
+            # Ensure we are inside an app context
+            generated_path = ""
+            try:
+                with app.app_context(): 
+                    generated_path = url_for(endpoint, **values, _external=False)
+                    print(f"[DEBUG] page_url: Generated path by url_for = '{generated_path}'")
+            except Exception as e:
+                print(f"[ERROR] page_url: Error generating path with url_for: {e}")
+                # Fallback or raise error? For now, return path as is or root.
+                generated_path = f"/{endpoint}" # Basic fallback
+            
+            # If CloudFront domain exists (production), prepend it
+            if cloudfront_domain:
+                # Ensure the path starts with a slash
+                # if not generated_path.startswith('/'): # Keep this check
+                #     generated_path = '/' + generated_path
+                # REMOVE the stage prefix from the path generated by url_for
+                stage_prefix = f"/{app.config.get('API_CONFIG', {}).get('STAGE', 'dev')}"
+                if generated_path.startswith(stage_prefix + '/'):
+                     generated_path = generated_path[len(stage_prefix):]
+                elif generated_path == stage_prefix: # Handle root path case if url_for generates just /dev
+                     generated_path = '/'
+
+                final_url = f"https://{cloudfront_domain}{generated_path}" # Use the modified path
+                print(f"[DEBUG] page_url: Using CloudFront domain (Removed stage prefix).")
+            else:
+                # Otherwise, use the path generated by url_for (usually root-relative)
+                final_url = generated_path
+                print(f"[DEBUG] page_url: Not using CloudFront domain.")
+
+            print(f"[DEBUG] page_url: Generated URL for '{endpoint}' = '{final_url}'")
+            return final_url
+        # --- End new page_url function ---
+
         def asset_url(filename):
-            """生成资源文件URL"""
-            if is_production:
-                return f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/{filename}"
-            return url_for('static', filename=filename)
-        
+            # Add debug print here too
+            print(f"[DEBUG] asset_url called for: {filename}")
+            return static_url(filename) # Assumes assets are under static/
+
         def get_asset_url(path):
-            """生成资源URL"""
-            if is_production:
-                return f"https://{os.getenv('CLOUDFRONT_DOMAIN')}/{path}"
+            # Add debug print here too
+            print(f"[DEBUG] get_asset_url called for: {path}")
+            cloudfront_domain = os.getenv('CLOUDFRONT_DOMAIN')
+            if is_production and cloudfront_domain:
+                 final_url = f"https://{cloudfront_domain}/{path}"
+                 print(f"[DEBUG] get_asset_url (prod): Generated URL = '{final_url}'")
+                 return final_url
+            print(f"[DEBUG] get_asset_url (dev/fallback): Returning original path = '{path}'")
             return path
-                
-        config['getAssetUrl'] = get_asset_url
-                
+
+        config_data['getAssetUrl'] = get_asset_url
+
         return dict(
             static_url=static_url,
+            page_url=page_url,
             asset_url=asset_url,
             env=env,
-            config=config
+            config=config_data
         )
 
     # CSRF 保护配置
@@ -163,16 +249,26 @@ def create_app(config_name='default'):
 
     # 添加 CSRF 保护
     csrf = CSRFProtect(app) # Restore CSRF initialization
+    print("[DEBUG] create_app: CSRF Initialized.") # DEBUG CSRF
 
     # 初始化数据库
-    db.init_app(app)
-    migrate = Migrate(app, db)
+    try:
+        db.init_app(app)
+        print("[DEBUG] create_app: DB Initialized.") # DEBUG DB INIT
+        migrate = Migrate(app, db)
+        print("[DEBUG] create_app: Migrate Initialized.") # DEBUG MIGRATE
+    except Exception as e:
+        print(f"[ERROR] create_app: DB or Migrate initialization failed: {e}")
 
     # 注册蓝图
-    app.register_blueprint(main_bp)
-    app.register_blueprint(vocabulary_bp, url_prefix='/vocabulary')
-    app.register_blueprint(forum_bp, url_prefix='/forum')
-    app.register_blueprint(profile_bp, url_prefix='/profile')
+    try:
+        app.register_blueprint(main_bp)
+        app.register_blueprint(vocabulary_bp, url_prefix='/vocabulary')
+        app.register_blueprint(forum_bp, url_prefix='/forum')
+        app.register_blueprint(profile_bp, url_prefix='/profile')
+        print("[DEBUG] create_app: Blueprints registered.") # DEBUG BLUEPRINTS
+    except Exception as e:
+        print(f"[ERROR] create_app: Blueprint registration failed: {e}")
 
     # 登录验证装饰器
     def login_required(f):
@@ -183,13 +279,73 @@ def create_app(config_name='default'):
             return f(*args, **kwargs)
         return decorated_function
 
-    # 全局上下文处理器
+    # 全局上下文处理器 (添加平均分计算)
     @app.context_processor
     def inject_user():
-        if 'user_id' in session:
-            user = User.query.get(session['user_id'])
-            return {'current_user': user}
-        return {'current_user': None}
+        user_id = session.get('user_id')
+        user_context = {
+            'current_user': None,
+            'practice_counts': {'reading': 0, 'topic': 0, 'vocabulary': 0, 'total': 0},
+            'average_scores': {'reading': 0.0, 'topic': 0.0}
+        }
+
+        if user_id:
+            try:
+                user = User.query.get(user_id)
+                if user:
+                    user_context['current_user'] = user
+                    print(f"[DEBUG] inject_user: Found user {user_id}")
+
+                    # --- Query counts and averages within the active session --- 
+                    try:
+                        # Calculate Counts
+                        reading_count = db.session.query(func.count(ReadingRecord.id)).filter(ReadingRecord.user_id == user_id).scalar() or 0
+                        topic_count = db.session.query(func.count(TopicRecord.id)).filter(TopicRecord.user_id == user_id).scalar() or 0
+                        try:
+                            vocab_count = db.session.query(func.count(VocabularyRecord.id)).filter(VocabularyRecord.user_id == user_id).scalar() or 0
+                        except Exception as vocab_e:
+                            print(f"[WARN] inject_user: Could not query VocabularyRecord count: {vocab_e}")
+                            vocab_count = 0
+                        total_practices_count = reading_count + topic_count + vocab_count
+                        user_context['practice_counts'] = {'reading': reading_count, 'topic': topic_count, 'vocabulary': vocab_count, 'total': total_practices_count}
+                        print(f"[DEBUG] inject_user: Calculated counts: {user_context['practice_counts']}")
+
+                        # Calculate Average Scores (only if counts > 0 to avoid division by zero in avg)
+                        avg_reading = 0.0
+                        if reading_count > 0:
+                           avg_reading_result = db.session.query(
+                               func.avg(
+                                   (ReadingRecord.accuracy_score + ReadingRecord.fluency_score + 
+                                    ReadingRecord.completeness_score + ReadingRecord.pronunciation_score) / 4.0
+                               )
+                           ).filter(ReadingRecord.user_id == user_id).scalar()
+                           avg_reading = round(float(avg_reading_result or 0), 1)
+
+                        avg_topic = 0.0
+                        if topic_count > 0:
+                            avg_topic_result = db.session.query(
+                                func.avg(
+                                    (TopicRecord.grammar_score + TopicRecord.content_score + 
+                                     TopicRecord.relevance_score) / 3.0
+                                )
+                            ).filter(TopicRecord.user_id == user_id).scalar()
+                            avg_topic = round(float(avg_topic_result or 0), 1)
+
+                        user_context['average_scores'] = {'reading': avg_reading, 'topic': avg_topic}
+                        print(f"[DEBUG] inject_user: Calculated average scores: {user_context['average_scores']}")
+
+                    except Exception as query_error:
+                         print(f"[ERROR] inject_user: Error querying practices/scores for user {user_id}: {query_error}")
+                         # Keep default counts/scores (all 0) on error
+                    # --- End query --- 
+                else:
+                     print(f"[WARN] inject_user: User ID {user_id} found in session but not in DB.")
+
+            except Exception as e:
+                print(f"[ERROR] inject_user: Error fetching user {user_id}: {e}")
+                # user_context remains with None/default values
+
+        return user_context # Return the whole context dictionary
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
@@ -213,15 +369,18 @@ def create_app(config_name='default'):
 
     @app.route('/register', methods=['GET', 'POST'])
     def register():
+        print("[DEBUG] Entered /register route") # Add this debug log
         if request.method == 'POST':
             username = request.form.get('username')
             password = request.form.get('password')
             confirm_password = request.form.get('confirm_password')
             
             if password != confirm_password:
+                print("[DEBUG] /register POST - Password mismatch") # Add log
                 return render_template('register.html', error='パスワードが一致しません')
             
             if User.query.filter_by(username=username).first():
+                print("[DEBUG] /register POST - Username exists") # Add log
                 return render_template('register.html', error='このユーザー名は既に使用されています')
             
             user = User(username=username)
@@ -288,12 +447,17 @@ def create_app(config_name='default'):
             try:
                 db.session.add(user)
                 db.session.commit()
-                return redirect(url_for('login'))
+                print(f"[INFO] User {username} registered successfully.") # Add log
+                session['user_id'] = user.id
+                session['username'] = user.username
+                return redirect(url_for('index', active_tab='dashboard'))
             except Exception as e:
                 db.session.rollback()
-                app.logger.error(f"Error registering user: {str(e)}")
-                return render_template('register.html', error='ユーザー登録に失敗しました')
+                print(f"[ERROR] /register POST - DB Error: {e}") # Add log
+                return render_template('register.html', error='登録中にエラーが発生しました')
         
+        # For GET request:
+        print("[DEBUG] /register GET - Rendering template") # Add log
         return render_template('register.html')
 
     @app.route('/logout')
@@ -308,13 +472,26 @@ def create_app(config_name='default'):
         return redirect(url_for('index', active_tab=request.args.get('active_tab', 'dashboard')))
 
     @app.route('/')
-    # @login_required # 本地测试时暂时注释掉
     def index():
-        # 默认加载仪表板标签页
+        print("[DEBUG] Entered / route (index)")
+        # Check if user is logged in
+        if 'user_id' not in session:
+            print("[DEBUG] / route - User not logged in. Redirecting to login.")
+            # Redirect to login page using page_url for correct CloudFront URL
+            return redirect(page_url('login'))
+        
+        # User is logged in, proceed to render index.html
+        print("[DEBUG] / route - User logged in. Rendering index.html.")
         active_tab = request.args.get('active_tab', 'dashboard')
-        user_id = session.get('user_id') # 使用 .get() 安全获取 user_id
-        current_user = User.query.get(user_id) if user_id else None # 如果 user_id 存在则查询用户，否则为 None
-        return render_template('index.html', active_tab=active_tab, current_user=current_user)
+        # current_user is now injected by the context processor
+        print(f"[DEBUG] / route - Rendering index.html, active_tab={active_tab}")
+        try:
+            # Pass active_tab explicitly, current_user comes from context processor
+            return render_template('index.html', active_tab=active_tab)
+        except Exception as e:
+            print(f"[ERROR] Error in / route: {e}")
+            flash('An error occurred while loading the page.')
+            return render_template('error.html', error_message="Could not load the main page."), 500
 
     # 保存阅读练习记录
     def save_reading_record(user_id, content, scores, difficulty='medium'):
@@ -1104,9 +1281,8 @@ def create_app(config_name='default'):
                 'avg_reading_score': user.avg_reading_score,
                 'avg_topic_score': user.avg_topic_score,
                 'total_practices': user.total_practices,
-                'total_study_time': user.total_study_time,
                 'streak_days': user.streak_days,
-                'last_practice': user.last_practice.strftime('%Y-%m-%d %H:%M') if user.last_practice else None,
+                'last_practice': user.last_practice_at.strftime('%Y-%m-%d %H:%M') if user.last_practice_at else None,
                 'created_at': user.created_at.strftime('%Y年%m月%d日')
             }
         })
@@ -1210,6 +1386,16 @@ def create_app(config_name='default'):
             logging.error(f"生成练习文本时出错: {str(e)}")
             return jsonify({"success": False, "message": "文章生成に失敗しました"})
 
+    @app.route('/favicon.ico')
+    def favicon():
+        # Return an empty 204 No Content response
+        # Alternatively, serve a real icon: return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+        response = make_response("")
+        response.status_code = 204
+        response.mimetype = 'image/x-icon' # Set mimetype even for empty response
+        return response
+
+    print("[DEBUG] create_app: App creation finished.") # DEBUG END
     return app
 
 app = create_app(os.getenv('FLASK_ENV', 'default'))

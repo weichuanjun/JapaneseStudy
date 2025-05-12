@@ -3,7 +3,7 @@
 {% block title %}読み上げ{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='readalong.css') }}">
+<!-- <link rel="stylesheet" href="{{ static_url('readalong.css') }}"> Assuming readalong.css does not exist -->
 {% endblock %}
 
 {% block content %}
@@ -19,6 +19,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='microsoft.cognitiveservices.speech.sdk.bundle.js') }}"></script>
-<script src="{{ url_for('static', filename='readalong.js') }}"></script>
+<script src="{{ static_url('js/microsoft.cognitiveservices.speech.sdk.bundle.js') }}"></script>
+<script src="{{ static_url('js/readalong.js') }}"></script>
 {% endblock %}

@@ -83,27 +83,27 @@
         {% if current_user %}
         <ul class="nav-list">
             <li class="nav-item">
-                <a href="{{ url_for('main.index', active_tab='dashboard') }}" class="nav-link {% if active_tab == 'dashboard' %}active{% endif %}">
+                <a href="{{ page_url('main.index', active_tab='dashboard') }}" class="nav-link {% if active_tab == 'dashboard' %}active{% endif %}">
                     <i class="fas fa-chart-line"></i> ダッシュボード
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('main.index', active_tab='read') }}" class="nav-link {% if active_tab == 'read' %}active{% endif %}">
+                <a href="{{ page_url('main.index', active_tab='read') }}" class="nav-link {% if active_tab == 'read' %}active{% endif %}">
                     <i class="fas fa-book-reader"></i> 発音練習
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('main.index', active_tab='topic') }}" class="nav-link {% if active_tab == 'topic' %}active{% endif %}">
+                <a href="{{ page_url('main.index', active_tab='topic') }}" class="nav-link {% if active_tab == 'topic' %}active{% endif %}">
                     <i class="fas fa-comments"></i> スピーチ
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('vocabulary.vocabulary_page') }}" class="nav-link {% if active_tab == 'vocabulary' %}active{% endif %}">
+                <a href="{{ page_url('vocabulary.vocabulary_page') }}" class="nav-link {% if active_tab == 'vocabulary' %}active{% endif %}">
                     <i class="fas fa-book"></i> 単語学習
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('forum.forum_page') }}" class="nav-link {% if active_tab == 'forum' %}active{% endif %}">
+                <a href="{{ page_url('forum.forum_page') }}" class="nav-link {% if active_tab == 'forum' %}active{% endif %}">
                     <i class="fas fa-comments"></i> 掲示板
                 </a>
             </li>
@@ -135,32 +135,32 @@
                 <div class="popup-scores">
                     <div class="score-item">
                         <div class="score-label">読む - 平均スコア</div>
-                        <div class="score-value">{{ "%.1f"|format(current_user.avg_reading_score or 0) }}</div>
+                        <div class="score-value">{{ "%.1f"|format(average_scores.reading if average_scores else 0) }}</div>
                     </div>
                     <div class="score-item">
                         <div class="score-label">Topic - 平均スコア</div>
-                        <div class="score-value">{{ "%.1f"|format(current_user.avg_topic_score or 0) }}</div>
+                        <div class="score-value">{{ "%.1f"|format(average_scores.topic if average_scores else 0) }}</div>
                     </div>
                     <div class="score-item">
                         <div class="score-label">総練習回数</div>
-                        <div class="score-value">{{ current_user.total_practices or 0 }}</div>
+                        <div class="score-value">{{ practice_counts.total if practice_counts else 0 }}</div>
                     </div>
                     <div class="score-item">
                         <div class="score-label">学習時間</div>
-                        <div class="score-value">{{ current_user.total_study_time or 0 }}分</div>
+                        <div class="score-value">0分</div>
                     </div>
                 </div>
                 <div class="popup-info">
-                    <div>最後の練習: {{ current_user.last_practice.strftime('%Y年%m月%d日 %H:%M') if current_user.last_practice else 'なし' }}</div>
+                    <div>最後の練習: {{ current_user.last_practice_at.strftime('%Y年%m月%d日 %H:%M') if current_user.last_practice_at else 'なし' }}</div>
                     <div>連続学習日数: {{ current_user.streak_days or 0 }}日</div>
                 </div>
                 <hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;">
                 <div class="popup-actions">
-                    <a href="{{ url_for('profile.profile') }}" style="display: flex; align-items: center; gap: 8px; color: #333; text-decoration: none; padding: 8px 0; margin-bottom: 8px;">
+                    <a href="{{ page_url('profile.profile') }}" style="display: flex; align-items: center; gap: 8px; color: #333; text-decoration: none; padding: 8px 0; margin-bottom: 8px;">
                         <i class="fas fa-user-edit"></i>
                         プロフィール編集
                     </a>
-                    <a href="{{ url_for('logout') }}" style="display: flex; align-items: center; gap: 8px; color: #dc3545; text-decoration: none; padding: 8px 0;">
+                    <a href="{{ page_url('logout') }}" style="display: flex; align-items: center; gap: 8px; color: #dc3545; text-decoration: none; padding: 8px 0;">
                         <i class="fas fa-sign-out-alt"></i>
                         ログアウト
                     </a>
@@ -169,11 +169,11 @@
         </div>
         {% else %}
         <div class="nav-right">
-            <a href="{{ url_for('login') }}" class="nav-link">
+            <a href="{{ page_url('login') }}" class="nav-link">
                 <i class="fas fa-sign-in-alt"></i>
                 ログイン
             </a>
-            <a href="{{ url_for('register') }}" class="nav-link">
+            <a href="{{ page_url('register') }}" class="nav-link">
                 <i class="fas fa-user-plus"></i>
                 新規登録
             </a>
@@ -186,11 +186,13 @@
     <!-- 基础 JavaScript 库 -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
-    <!-- 配置和工具 (移除重复的 config.js 引用) -->
-    <!-- <script src="{{ static_url('js/config.js') }}"></script> -->
+    <!-- 配置和工具 (config.js 可能需要在 base 中，因为它可能被多个页面使用) -->
+    <script src="{{ static_url('js/config.js') }}"></script>
     
     <!-- 页面特定的 JavaScript -->
-    {% block scripts %}{% endblock %}
+    {% block scripts %}
+        <!-- Specific page scripts will be inserted here -->
+    {% endblock %}
 
     <!-- 额外的 JavaScript -->
     {% block extra_js %}{% endblock %}

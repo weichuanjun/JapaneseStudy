@@ -3,7 +3,7 @@
 {% block title %}トピック{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/topic.css') }}">
+<!-- <link rel="stylesheet" href="{{ static_url('css/topic.css') }}"> Assuming topic.css does not exist -->
 {% endblock %}
 
 {% block content %}
@@ -39,5 +39,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/topic.js') }}"></script>
+<!-- <script src="{{ static_url('js/topic.js') }}"></script> Assuming topic.js does not exist -->
 {% endblock %} 

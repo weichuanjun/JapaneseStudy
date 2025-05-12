@@ -614,6 +614,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
                 },
                 body: JSON.stringify({ difficulty: selectedDifficulty })
             })
@@ -688,6 +689,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                 // 发送音频进行识别
                                 const response = await fetch('/transcribe_audio', {
                                     method: 'POST',
+                                    headers: {
+                                        'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
+                                    },
                                     body: formData
                                 });
 

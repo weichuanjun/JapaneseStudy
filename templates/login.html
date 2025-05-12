@@ -92,7 +92,8 @@
         {% if error %}
         <div class="error-message">{{ error }}</div>
         {% endif %}
-        <form method="POST" action="{{ url_for('login') }}">
+        <form method="POST" action="{{ page_url('login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="username">ユーザー名</label>
                 <input type="text" id="username" name="username" required>
@@ -104,7 +105,7 @@
             <button type="submit" class="submit-btn">ログイン</button>
         </form>
         <div class="register-link">
-            アカウントをお持ちでない方は<a href="{{ url_for('register') }}">新規登録</a>
+            アカウントをお持ちでない方は<a href="{{ page_url('register') }}">新規登録</a>
         </div>
     </div>
 </body>

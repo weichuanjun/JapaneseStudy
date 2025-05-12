@@ -3,7 +3,7 @@
 {% block title %}プロフィール{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/profile.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -78,6 +78,9 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Include profile.js using static_url -->
+<script src="{{ static_url('js/profile.js') }}"></script>
+<!-- Inline script remains -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 获取表单元素

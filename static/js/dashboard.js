@@ -590,7 +590,7 @@ function bindUserPopupEvents() {
                     document.getElementById('popupTotalPractices').textContent =
                         user.total_practices || 0;
                     document.getElementById('popupTotalStudyTime').textContent =
-                        `${user.total_study_time || 0}分`;
+                        `0分`;
                     document.getElementById('popupBirthday').textContent =
                         user.birthday || '-';
                     document.getElementById('popupZodiac').textContent =

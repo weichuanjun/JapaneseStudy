@@ -992,266 +992,89 @@
 {% endblock %}
 
 {% block scripts %}
-{{ super() }}
-<!-- 基础库 -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Load scripts needed ONLY for index.html (Dashboard, Readalong, Topic) -->
+    <script src="{{ static_url('js/index.js') }}"></script>
+    <script src="{{ static_url('js/dashboard.js') }}"></script>
+    <script src="{{ static_url('js/readalong.js') }}"></script>
+    <script src="{{ static_url('js/pronunciation.js') }}"></script>
+    <!-- Remove scripts not needed on this page: vocabulary.js, forum.js, profile.js -->
+    <!-- <script src="{{ static_url('js/vocabulary.js') }}"></script> -->
+    <!-- <script src="{{ static_url('js/forum.js') }}"></script> -->
+    <!-- <script src="{{ static_url('js/profile.js') }}"></script> -->
 
-<!-- Microsoft Speech SDK -->
-<script src="{{ url_for('static', filename='js/microsoft.cognitiveservices.speech.sdk.bundle.js') }}"></script>
+    <!-- Include potentially required libraries if not in base -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ static_url('js/microsoft.cognitiveservices.speech.sdk.bundle.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/RecorderJS/0.1.0/recorder.js"></script>
 
-<!-- 录音相关 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/RecorderJS/0.1.0/recorder.js"></script>
-
-<!-- 应用脚本 -->
-<script src="{{ url_for('static', filename='js/config.js') }}"></script>
-<script src="{{ url_for('static', filename='js/index.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-<script src="{{ url_for('static', filename='js/readalong.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pronunciation.js') }}"></script>
-<script src="{{ url_for('static', filename='js/vocabulary.js') }}"></script>
-<script src="{{ url_for('static', filename='js/forum.js') }}"></script>
-<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
-
-<!-- 初始化全局变量 -->
-<script>
-// 全局变量
-window.currentDifficulty = 'easy';
-window.currentTopicDifficulty = 'easy';
-</script>
-
-<script>
-function toggleRecords(recordsId) {
-    const content = document.getElementById(recordsId);
-    const button = content.previousElementSibling;
-    if (content.style.display === 'none') {
-        content.style.display = 'block';
-        button.innerHTML = '詳細記録を隠す ▲';
-    } else {
-        content.style.display = 'none';
-        button.innerHTML = '詳細記録を表示 ▼';
-    }
-}
-</script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const userInfoPopup = document.getElementById('userInfoPopup');
-    const leaderboardUsers = document.querySelectorAll('.leaderboard-user');
-    
-    // 设置默认头像颜色
-    function getRandomColor(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const hue = hash % 360;
-        return `hsl(${hue}, 70%, 45%)`;
-    }
-
-    document.querySelectorAll('.leaderboard-avatar').forEach(avatar => {
-        if (!avatar.querySelector('img')) {
-            const username = avatar.textContent.trim();
-            avatar.style.setProperty('--avatar-color', getRandomColor(username));
-        }
-    });
-
-    // 处理鼠标悬停事件
-    leaderboardUsers.forEach(user => {
-        let timeout;
-        
-        user.addEventListener('mouseenter', async function(e) {
-            const userId = this.closest('.leaderboard-row').dataset.userId;
-            clearTimeout(timeout);
-            
-            try {
-                const response = await window.apiCall(`/api/user/${userId}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    const user = data.user;
-                    
-                    // 更新弹窗内容
-                    document.getElementById('popupUsername').textContent = user.username;
-                    document.getElementById('popupJoinDate').textContent = `会員登録: ${user.created_at}`;
-                    document.getElementById('popupReadingScore').textContent = 
-                        (user.avg_reading_score || 0).toFixed(1);
-                    document.getElementById('popupTopicScore').textContent = 
-                        (user.avg_topic_score || 0).toFixed(1);
-                    document.getElementById('popupTotalPractices').textContent = 
-                        user.total_practices || 0;
-                    document.getElementById('popupTotalStudyTime').textContent = 
-                        `${user.total_study_time || 0}分`;
-                    document.getElementById('popupStreakDays').textContent = 
-                        `${user.streak_days || 0}日`;
-                    document.getElementById('popupLastPractice').textContent = 
-                        user.last_practice || '-';
-                    document.getElementById('popupBirthday').textContent = 
-                        user.birthday || '-';
-                    document.getElementById('popupZodiac').textContent = 
-                        user.zodiac_sign || '-';
-                    document.getElementById('popupMBTI').textContent = 
-                        user.mbti || '-';
-                    document.getElementById('popupBio').textContent = 
-                        user.bio || '-';
-                    
-                    // 处理头像显示
-                    const avatarImg = document.getElementById('popupUserAvatar');
-                    const avatarInitial = document.getElementById('popupUserInitial');
-                    
-                    if (user.avatar_data) {
-                        avatarImg.src = user.avatar_data;
-                        avatarImg.style.display = 'block';
-                        avatarInitial.style.display = 'none';
-                    } else {
-                        avatarImg.style.display = 'none';
-                        avatarInitial.style.display = 'flex';
-                        avatarInitial.textContent = user.username[0];
-                        avatarInitial.style.setProperty('--avatar-color', getRandomColor(user.username));
-                    }
-                    
-                    // 计算弹窗位置
-                    const rect = this.getBoundingClientRect();
-                    const popupRect = userInfoPopup.getBoundingClientRect();
-                    const windowWidth = window.innerWidth;
-                    const windowHeight = window.innerHeight;
-                    
-                    // 默认显示在右侧
-                    let left = rect.right + 10;
-                    let top = rect.top;
-                    
-                    // 如果右侧空间不足，显示在左侧
-                    if (left + popupRect.width > windowWidth) {
-                        left = rect.left - popupRect.width - 10;
-                    }
-                    
-                    // 如果底部空间不足，向上偏移
-                    if (top + popupRect.height > windowHeight) {
-                        top = windowHeight - popupRect.height - 10;
-                    }
-                    
-                    // 设置弹窗位置
-                    userInfoPopup.style.left = `${left}px`;
-                    userInfoPopup.style.top = `${top}px`;
-                    
-                    // 显示弹窗
-                    userInfoPopup.classList.add('show');
-                }
-            } catch (error) {
-                console.error('Error fetching user info:', error);
+    <!-- Initialization script specific to index page functionality -->
+    <script>
+        // Initialize difficulty on DOM loaded (variables are declared in pronunciation.js)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize based on the active tab or a default
+            const initialTab = document.querySelector('.nav-links a.active')?.dataset.tab || 'dashboard';
+            if (initialTab === 'read' || initialTab === 'topic') {
+                 // Only initialize difficulty if the relevant tab is active initially
+                 // Note: pronunciation.js should handle its own initialization ideally
+                 if (typeof setDifficulty === 'function') setDifficulty('easy');
+                 if (typeof setTopicDifficulty === 'function') setTopicDifficulty('easy');
             }
+            // Initialize other index-specific things if needed
         });
 
-        user.addEventListener('mouseleave', function() {
-            // 添加延迟，避免鼠标移动到弹窗时立即关闭
-            timeout = setTimeout(() => {
-                userInfoPopup.classList.remove('show');
-            }, 300);
-        });
-    });
-
-    // 允许鼠标移动到弹窗上
-    userInfoPopup.addEventListener('mouseenter', () => {
-        clearTimeout(timeout);
-    });
-
-    userInfoPopup.addEventListener('mouseleave', () => {
-        userInfoPopup.classList.remove('show');
-    });
-});
-</script>
-
-<script>
-// 全局变量
-let currentDifficulty = 'easy';
-let currentTopicDifficulty = 'easy';
-
-// 初始化难度选择
-document.addEventListener('DOMContentLoaded', function() {
-    // 设置默认难度
-    setDifficulty('easy');
-    setTopicDifficulty('easy');
-});
-
-// 发音练习难度选择
-function setDifficulty(difficulty) {
-    const tags = document.querySelectorAll('#readTab .difficulty-tag');
-    tags.forEach(tag => {
-        tag.classList.remove('active');
-        if (tag.dataset.difficulty === difficulty) {
-            tag.classList.add('active');
+        // Difficulty selection functions (assuming pronunciation.js might be loaded later or conditionally)
+        function setDifficulty(difficulty) {
+            // Ensure pronunciation.js is loaded and function exists
+            if (typeof window.setPronunciationDifficulty === 'function') {
+                window.setPronunciationDifficulty(difficulty); // Call function namespaced if possible 
+            } else if (typeof currentDifficulty !== 'undefined') {
+                const tags = document.querySelectorAll('#readTab .difficulty-tag');
+                tags.forEach(tag => {
+                    tag.classList.remove('active');
+                    if (tag.dataset.difficulty === difficulty) {
+                        tag.classList.add('active');
+                    }
+                });
+                currentDifficulty = difficulty;
+                // getRandomText(); // Consider if this should be called here or within pronunciation.js
+            } else {
+                console.warn('setDifficulty function or currentDifficulty variable not found.');
+            }
         }
-    });
-    currentDifficulty = difficulty;
-    getRandomText();
-}
 
-// Topic练习难度选择
-function setTopicDifficulty(difficulty) {
-    const tags = document.querySelectorAll('#topicTab .difficulty-tag');
-    tags.forEach(tag => {
-        tag.classList.remove('active');
-        if (tag.dataset.difficulty === difficulty) {
-            tag.classList.add('active');
+        function setTopicDifficulty(difficulty) {
+            if (typeof window.setTopicPracticeDifficulty === 'function') {
+                 window.setTopicPracticeDifficulty(difficulty); // Call function namespaced if possible
+            } else if (typeof currentTopicDifficulty !== 'undefined') {
+                 const tags = document.querySelectorAll('#topicTab .difficulty-tag');
+                tags.forEach(tag => {
+                    tag.classList.remove('active');
+                    if (tag.dataset.difficulty === difficulty) {
+                        tag.classList.add('active');
+                    }
+                });
+                currentTopicDifficulty = difficulty;
+                // getRandomTopic(); // Consider if this should be called here or within pronunciation.js
+            } else {
+                console.warn('setTopicDifficulty function or currentTopicDifficulty variable not found.');
+            }
         }
-    });
-    currentTopicDifficulty = difficulty;
-    getRandomTopic();
-}
+        
+        // Remove getRandomText/getRandomTopic if they are defined and called within pronunciation.js
+        // function getRandomText() { ... }
+        // function getRandomTopic() { ... }
 
-// 获取随机文本
-function getRandomText() {
-    window.apiCall('/api/reading/random', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
-        },
-        body: JSON.stringify({
-            difficulty: currentDifficulty
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('reftext').value = data.text;
-        } else {
-            console.error('Error getting random text:', data.message);
+        function toggleRecords(recordsId) {
+            const content = document.getElementById(recordsId);
+            const button = content.previousElementSibling;
+            if (!content) return; // Add guard clause
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                if (button) button.innerHTML = '詳細記録を隠す ▲'; // Check if button exists
+            } else {
+                content.style.display = 'none';
+                if (button) button.innerHTML = '詳細記録を表示 ▼'; // Check if button exists
+            }
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
-}
-
-// 获取随机话题
-function getRandomTopic() {
-    window.apiCall('/api/topic/random', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
-        },
-        body: JSON.stringify({
-            difficulty: currentTopicDifficulty
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('topicText').value = data.topic;
-        } else {
-            console.error('Error getting random topic:', data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
-}
-
-// 绑定生成按钮事件
-document.getElementById('generateText').addEventListener('click', getRandomText);
-document.getElementById('generateTopic').addEventListener('click', getRandomTopic);
-</script>
+    </script>
 {% endblock %}
